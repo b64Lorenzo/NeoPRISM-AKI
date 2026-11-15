@@ -6,6 +6,7 @@ import math
 from collections.abc import Mapping
 from pathlib import Path
 import re
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import xml.etree.ElementTree as ET
 
 
@@ -107,29 +108,72 @@ def _decode_phased_map(root: ET.Element) -> dict:
     mapping = _decode_value(root[0])
     if {"parameters", "postoperative_measurements", "post_class_failures"} & mapping.keys():
         raise ValueError("Define parameters and measurements in their phase, not in settings")
+    phase_items = mapping.get("included_phases")
+    if not isinstance(phase_items, list) or len(phase_items) != 3 or any(
+        not isinstance(item, dict) or set(item) != {"phase", "end_event"}
+        for item in phase_items
+    ):
+        raise ValueError("included_phases needs three phase objects with phase and end_event")
+    if "phase_boundaries" in mapping or "catalog_phases" in mapping:
+        raise ValueError("Define phase end events only inside included_phases items")
+    mapping["included_phases"] = [item["phase"] for item in phase_items]
+    mapping["catalog_phases"] = mapping["included_phases"].copy()
+    mapping["phase_boundaries"] = {
+        "operation_start": phase_items[0]["end_event"],
+        "operation_end": phase_items[1]["end_event"],
+    }
+    if phase_items[2]["end_event"] is not None:
+        mapping["phase_boundaries"]["postoperative_end"] = phase_items[2]["end_event"]
     mapping["parameters"] = []
+    mapping["during_class_names"] = []
+    mapping["timeless_class_names"] = []
     measurement_positions = []
     post_class_failures = []
     phases = {"pre": "Pre-operative", "during": "During-operative", "post": "Post-operative"}
+    saw_during_classes = False
     for section in root[1:]:
         phase = phases[section.tag]
         for group in section:
+            if section.tag == "during" and group.tag == "availableClasses":
+                if saw_during_classes:
+                    raise ValueError("During-operative availableClasses may appear only once")
+                items = list(group)
+                if not items or any(item.tag != "className" or not (item.text or "").strip() for item in items):
+                    raise ValueError("During-operative availableClasses needs className values")
+                class_names = [item.text.strip() for item in items]
+                if any(not re.fullmatch(r"epic\.[^.]+", name) for name in class_names):
+                    raise ValueError("During-operative availableClasses must use exact Epic class names")
+                if len({name.casefold() for name in class_names}) != len(class_names):
+                    raise ValueError("During-operative availableClasses cannot contain duplicates")
+                mapping["during_class_names"] = class_names
+                saw_during_classes = True
+                continue
             if group.tag == "parameter":
                 definitions = [group]
+                class_name = None
+                timed = True
             elif group.tag == "class":
-                name = group.get("name", "")
-                if not re.fullmatch(r"epic\.[^.]+", name):
-                    raise ValueError(f"Invalid Epic class: {name}")
-                if not len(group) or any(child.tag != "parameter" for child in group):
-                    raise ValueError(f"Epic class {name} needs parameter definitions")
+                class_name = group.get("name", "")
+                if not re.fullmatch(r"epic\.[^.]+", class_name):
+                    raise ValueError(f"Invalid Epic class: {class_name}")
+                flag = group.find("timed")
+                if flag is not None and (flag.text or "").strip() not in {"true", "false"}:
+                    raise ValueError(f"Class {class_name} timed must be true or false")
+                timed = flag is None or flag.text.strip() == "true"
+                if not timed:
+                    if section.tag != "pre":
+                        raise ValueError("Untimed classes are supported only in pre-operative definitions")
+                    mapping["timeless_class_names"].append(class_name)
+                definitions = [child for child in group if child.tag == "parameter"]
+                if not definitions or len(definitions) + (flag is not None) != len(group):
+                    raise ValueError(f"Epic class {class_name} needs parameter definitions")
                 failure = group.get("failure")
                 if failure is not None:
                     if section.tag != "post" or failure != "nonempty":
                         raise ValueError("Class failure='nonempty' is supported only in post")
-                    if name in post_class_failures:
-                        raise ValueError(f"Duplicate post class failure: {name}")
-                    post_class_failures.append(name)
-                definitions = group
+                    if class_name in post_class_failures:
+                        raise ValueError(f"Duplicate post class failure: {class_name}")
+                    post_class_failures.append(class_name)
             else:
                 raise ValueError(f"Unsupported definition in relevantParameters/{section.tag}: {group.tag}")
             for element in definitions:
@@ -140,10 +184,10 @@ def _decode_phased_map(root: ET.Element) -> dict:
                 if not parameter_id:
                     raise ValueError("Parameter IDs must be present and unique")
                 if group.tag == "class" and not any(
-                    isinstance(field, str) and field.startswith(name + ".") and len(field) > len(name) + 1
+                    isinstance(field, str) and field.startswith(class_name + ".") and len(field) > len(class_name) + 1
                     for field in parameter.get("source_fields", [])
                 ):
-                    raise ValueError(f"Parameter {parameter_id} has no source field in {name}")
+                    raise ValueError(f"Parameter {parameter_id} has no source field in {class_name}")
                 has_measurement = "measurement" in parameter
                 measurement = parameter.pop("measurement", None)
                 position = element.get("measurementOrder")
@@ -166,6 +210,9 @@ def _decode_phased_map(root: ET.Element) -> dict:
                     parameter.setdefault("outcome_criteria", {"success": None, "failure": None})
                 parameter["id"] = parameter_id
                 parameter["phase"] = phase
+                parameter["timed"] = timed
+                if class_name is not None:
+                    parameter["class_name"] = class_name
                 mapping["parameters"].append(parameter)
     mapping["postoperative_measurements"] = [
         measurement for _, measurement in sorted(measurement_positions,
@@ -205,6 +252,30 @@ def load_parameter_map(path: str | Path, *, validate_runtime: bool = True) -> di
 
 
 def _validate_runtime_map(mapping: Mapping) -> None:
+    if not isinstance(mapping.get("export_time_series", False), bool):
+        raise ValueError("export_time_series must be boolean")
+    boundaries = mapping.get("phase_boundaries")
+    if not isinstance(boundaries, Mapping):
+        raise ValueError("Parameter map needs phase_boundaries for operation_start and operation_end")
+    event_names = ["operation_start", "operation_end"]
+    if "postoperative_end" in boundaries:
+        event_names.append("postoperative_end")
+    for event_name in event_names:
+        event = boundaries.get(event_name)
+        if not isinstance(event, Mapping):
+            raise ValueError(f"phase_boundaries.{event_name} needs event_fields and phrases")
+        for name in ("event_fields", "phrases"):
+            values = event.get(name)
+            if not isinstance(values, list) or not values or any(
+                not isinstance(value, str) or not value.strip() for value in values
+            ):
+                raise ValueError(f"phase_boundaries.{event_name}.{name} needs nonempty strings")
+            if len({" ".join(value.casefold().split()) for value in values}) != len(values):
+                raise ValueError(f"phase_boundaries.{event_name}.{name} cannot contain duplicates")
+    if {value.casefold().strip() for value in boundaries["operation_start"]["phrases"]} & {
+        value.casefold().strip() for value in boundaries["operation_end"]["phrases"]
+    }:
+        raise ValueError("phase_boundaries operation start and end phrases must not overlap")
     phases = ["Pre-operative", "During-operative", "Post-operative"]
     legacy_phases = ["Pre-operative", "Post-operative"]
     included = mapping.get("included_phases")
@@ -231,6 +302,54 @@ def _validate_runtime_map(mapping: Mapping) -> None:
         if not parameter_id or parameter_id in seen:
             raise ValueError("Parameter IDs must be present and unique")
         seen.add(parameter_id)
+    _validate_duration_specs(mapping, boundaries, parameters)
+
+
+def _validate_duration_specs(mapping: Mapping, boundaries: Mapping, parameters: list[dict]) -> None:
+    by_id = {item["id"]: item for item in parameters}
+    for measurement in mapping.get("postoperative_measurements", []):
+        duration = measurement.get("duration")
+        if duration is None:
+            continue
+        if not isinstance(duration, Mapping):
+            raise ValueError(f"Duration configuration for {measurement['id']} must be an object")
+        method = duration.get("method")
+        if method not in {"field_interval", "phase_boundary_interval"}:
+            raise ValueError(f"Unsupported duration method for {measurement['id']}")
+        if not isinstance(duration.get("label"), str) or not duration["label"].strip():
+            raise ValueError(f"Duration label is required for {measurement['id']}")
+        if duration.get("unit") not in {"seconds", "minutes", "hours", "days"}:
+            raise ValueError(f"Unsupported duration unit for {measurement['id']}")
+        precision = duration.get("precision")
+        if isinstance(precision, bool) or not isinstance(precision, int) or not 0 <= precision <= 6:
+            raise ValueError(f"Duration precision must be an integer from 0 to 6 for {measurement['id']}")
+        if method == "phase_boundary_interval":
+            if duration.get("aggregation") != "difference":
+                raise ValueError(f"Duration {measurement['id']} must use difference aggregation")
+            for name in ("start_boundary", "end_boundary"):
+                if duration.get(name) not in boundaries:
+                    raise ValueError(f"Duration {measurement['id']}.{name} must name a configured boundary")
+            continue
+        if duration.get("aggregation") != "sum_overlaps":
+            raise ValueError(f"Duration {measurement['id']} must use sum_overlaps aggregation")
+        if duration.get("datetime_format") != "iso8601":
+            raise ValueError(f"Duration datetime_format must be iso8601 for {measurement['id']}")
+        timezone_name = duration.get("timezone")
+        if not isinstance(timezone_name, str) or not timezone_name.strip():
+            raise ValueError(f"Duration timezone is required for {measurement['id']}")
+        try:
+            ZoneInfo(timezone_name)
+        except ZoneInfoNotFoundError as error:
+            raise ValueError(f"Unknown duration timezone for {measurement['id']}") from error
+        parameter = by_id.get(measurement["id"], {})
+        sources = parameter.get("source_fields", [])
+        for name in ("start_field", "end_field"):
+            field = duration.get(name)
+            if not isinstance(field, str) or not field.strip() or field not in sources:
+                raise ValueError(f"Duration {measurement['id']}.{name} must name a configured source field")
+        for name in ("match_start_boundary", "match_end_boundary"):
+            if duration.get(name) not in boundaries:
+                raise ValueError(f"Duration {measurement['id']}.{name} must name a configured boundary")
 
 
 def to_xml(mapping: Mapping) -> str:

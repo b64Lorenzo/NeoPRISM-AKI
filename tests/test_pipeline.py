@@ -119,7 +119,7 @@ class PipelineTests(unittest.TestCase):
 
             self.assertTrue((root / "results/missingness_patterns.csv").is_file())
             self.assertTrue((root / "results/pairwise_missingness.csv").is_file())
-            self.assertTrue((root / "results/missingness_heatmaps/input_001.png").is_file())
+            self.assertTrue((root / "results/missingness_heatmaps/input_001.html").is_file())
             report = (root / "results/missingness_report.md").read_text(encoding="utf-8")
             self.assertIn("complete cases", report.lower())
             self.assertIn("do not determine the missingness mechanism", report)
@@ -141,7 +141,7 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertIn("Analysis complete: 1 patient(s)", output.getvalue())
             self.assertTrue((root / "results/extraction_report.md").is_file())
-            self.assertEqual(len(list((root / "results").glob("*.csv"))), 3)
+            self.assertEqual(len(list((root / "results").glob("*.csv"))), 5)
             log_files = list((root / "logs").glob("*/run.log"))
             self.assertEqual(len(log_files), 1)
             log_text = log_files[0].read_text(encoding="utf-8")

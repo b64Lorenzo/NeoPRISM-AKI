@@ -11,8 +11,30 @@ from src.model_config import PerceptronModelConfig
 from src.parameter_distributions import generate_parameter_distributions
 from src.pipeline_config import load_pipeline_config, select_parameter_map, write_parameter_reference
 from src.patient_pipeline import analyze_inputs
+from src.patient_timeline import PatientTimelineDashboard
 from src.perceptron import plot_confusion_matrix, predict_model, train_model
+from src.time_series_plots import TimeSeriesPlotter
 from src.training_io import join_patient_vectors, read_csv_rows, write_csv_rows
+
+
+def _study_plot_artifacts(preprocessing: dict, plots: dict, model_config: dict) -> list[Path]:
+    candidates = [
+        preprocessing["output_directory"] / "preoperative_heatmap.html",
+        preprocessing["output_directory"] / "postoperative_heatmap.html",
+        plots["missingness_by_patient"]["output"],
+    ]
+    model_plot = model_config.get("plotting", {})
+    if model_plot.get("run") and model_plot.get("output"):
+        candidates.append(model_plot["output"])
+    for directory_name in ("missingness_heatmaps", "parameter_distributions"):
+        directory = preprocessing["output_directory"] / directory_name
+        if directory.is_dir():
+            candidates.extend(directory.rglob("*.html"))
+    time_series_dir = plots["time_series"]["output_directory"]
+    if time_series_dir.is_dir():
+        candidates.extend(time_series_dir.rglob("*.html"))
+    unique = {path.resolve(): path.resolve() for path in candidates if path.is_file()}
+    return [unique[path] for path in sorted(unique, key=lambda item: str(item).casefold())]
 
 
 def _configured_selection(preprocessing: dict) -> dict | None:
@@ -39,11 +61,6 @@ def run_pipeline(config_path: str | Path) -> str:
         select_parameter_map(parameter_map, **selection)
         if selection is not None else parameter_map
     )
-    has_during = any(item.get("phase") == "During-operative" for item in selected_map["parameters"])
-    if has_during and preprocessing["run"]:
-        raise ValueError("During-operative extraction needs an operation-end rule; header reporting is available without extraction")
-    if has_during and preprocessing["plotting"]["run"] and preprocessing["plotting"]["distributions"]:
-        raise ValueError("During-operative extraction and plotting need an operation-end rule; use header-only reporting")
     level = LogLevel[config["logging"]["level"]]
     log_directory = config["logging"]["directory"]
     completed = []
@@ -75,6 +92,11 @@ def run_pipeline(config_path: str | Path) -> str:
                 selected_map,
                 logger,
                 generate_plots=plots["run"],
+                generate_patient_missingness=(
+                    plots["run"] and plots["missingness_by_patient"]["run"]
+                ),
+                patient_missingness_output=plots["missingness_by_patient"]["output"],
+                plot_theme=plots["theme"],
             )
             completed.append("preprocessing")
         if plots["run"] and plots["distributions"]:
@@ -83,9 +105,29 @@ def run_pipeline(config_path: str | Path) -> str:
                 selected_map,
                 bins=plots["bins"],
                 phase=plots["phase"],
+                theme=plots["theme"],
             )
             logger.write(LogLevel.INFO, "plotting", f"distribution plots generated; parameters={count}")
             completed.append("preprocessing plots")
+
+        time_series_plots = plots["time_series"]
+        if time_series_plots["run"]:
+            result = TimeSeriesPlotter(selected_map).generate(
+                preprocessing["output_directory"] / "time_series.csv",
+                time_series_plots["output_directory"],
+                parameter_ids=time_series_plots["parameter_ids"],
+                class_names=time_series_plots["class_names"],
+                patient_ids=time_series_plots["patient_ids"],
+                group_by=time_series_plots["group_by"],
+                theme=plots["theme"],
+            )
+            logger.write(
+                LogLevel.INFO,
+                "time-series plots",
+                f"plots={result['plot_count']}; parameters={result['parameter_count']}; "
+                f"patients={result['patient_count']}; observations={result['observation_count']}",
+            )
+            completed.append("time-series plots")
 
         if perceptron_config["run"]:
             if perceptron_config["mode"] == "train-validation":
@@ -130,7 +172,9 @@ def run_pipeline(config_path: str | Path) -> str:
                     json.dumps(model_result, indent=2) + "\n", encoding="utf-8"
                 )
                 if perceptron_config["plotting"]["run"]:
-                    plot_confusion_matrix(model_result, perceptron_config["plotting"]["output"])
+                    plot_confusion_matrix(
+                        model_result, perceptron_config["plotting"]["output"], theme=plots["theme"],
+                    )
                     completed.append("perceptron plot")
                 logger.write(
                     LogLevel.INFO,
@@ -161,5 +205,28 @@ def run_pipeline(config_path: str | Path) -> str:
                     f"novel-data predictions complete; rows={len(predictions)}",
                 )
                 completed.append("novel-data predictions")
+
+        patient_timeline = plots["patient_timeline"]
+        if patient_timeline["run"]:
+            result = PatientTimelineDashboard(selected_map).generate(
+                preprocessing["inputs"],
+                patient_timeline["output"],
+                patient_ids=patient_timeline["patient_ids"],
+                compare_all_patients=patient_timeline["compare_all_patients"],
+                related_plots=(
+                    _study_plot_artifacts(preprocessing, plots, perceptron_config)
+                    if patient_timeline["include_study_plots"] else []
+                ),
+                theme=plots["theme"],
+                exclude_output_dir=preprocessing["output_directory"],
+                layout=patient_timeline["layout"],
+            )
+            logger.write(
+                LogLevel.INFO,
+                "patient timeline",
+                f"patients={result['patient_count']}; events={result['event_count']}; "
+                f"data_points={result['data_point_count']}",
+            )
+            completed.append("patient timeline dashboard")
 
     return ", ".join(completed) if completed else "no stages enabled"

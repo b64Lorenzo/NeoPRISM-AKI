@@ -7,6 +7,8 @@ from pathlib import Path
 import random
 from collections.abc import Mapping, Sequence
 
+from src.plotly_output import write_plotly_html
+
 NUMERIC_TYPES = {"numeric", "derived_numeric", "time_series_numeric", "derived_duration"}
 MISSING_VALUES = {"", "na", "n/a", "none", "null"}
 
@@ -300,33 +302,45 @@ def predict_model(model: Mapping, rows: Sequence[Mapping[str, object]]) -> list[
     return predictions
 
 
-def plot_confusion_matrix(model: Mapping, path: str | Path) -> None:
-    """Save an aggregate validation confusion matrix without patient-level data."""
+def plot_confusion_matrix(model: Mapping, path: str | Path, theme: str = "light") -> None:
+    """Write an interactive aggregate validation confusion matrix."""
+    from src.plotly_output import plotly_template
+
     try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
+        import plotly.graph_objects as go
     except ImportError as error:
-        raise RuntimeError("Perceptron plots require Matplotlib; install requirements.txt") from error
+        raise RuntimeError("Perceptron plots require Plotly; install requirements.txt") from error
 
     confusion = model["confusion"]
+    labels = ["Failure", "Success"]
     matrix = [
         [confusion["failure_predicted_failure"], confusion["failure_predicted_success"]],
         [confusion["success_predicted_failure"], confusion["success_predicted_success"]],
     ]
-    figure, axis = plt.subplots(figsize=(5, 4))
-    image = axis.imshow(matrix, cmap="Blues")
-    axis.set_xticks([0, 1], labels=["Failure", "Success"])
-    axis.set_yticks([0, 1], labels=["Failure", "Success"])
-    axis.set_xlabel("Predicted")
-    axis.set_ylabel("Actual")
-    axis.set_title("Perceptron validation confusion matrix")
-    for row_index, row in enumerate(matrix):
-        for column_index, value in enumerate(row):
-            axis.text(column_index, row_index, str(value), ha="center", va="center")
-    figure.colorbar(image, ax=axis, label="Patient count")
-    figure.tight_layout()
-    destination = Path(path)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    figure.savefig(destination, dpi=150)
-    plt.close(figure)
+    figure = go.Figure(
+        data=[
+            go.Heatmap(
+                z=matrix,
+                x=labels,
+                y=labels,
+                text=matrix,
+                texttemplate="%{text}",
+                colorscale="Blues",
+                colorbar={"title": {"text": "Patient count"}},
+                hovertemplate=(
+                    "Actual: %{y}<br>Predicted: %{x}<br>Patient count: %{z}<extra></extra>"
+                ),
+            )
+        ]
+    )
+    figure.update_layout(
+        title="Perceptron validation confusion matrix",
+        template=plotly_template(theme),
+        xaxis_title="Predicted",
+        yaxis_title="Actual",
+        width=600,
+        height=500,
+        margin={"l": 90, "r": 50, "t": 80, "b": 80},
+    )
+    figure.update_yaxes(autorange="reversed")
+    write_plotly_html(figure, path)

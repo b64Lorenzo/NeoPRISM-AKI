@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <pipelineConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="pipeline.xsd" version="1">
   <logging>
     <directory>logs</directory>
@@ -7,7 +7,7 @@
   <preprocessing>
     <run>true</run>
     <inputs>
-      <path>data/patients</path>
+      <path>C:\Users\zambe\Downloads\csv_final\csv_final</path>
     </inputs>
     <outputDirectory>results</outputDirectory>
     <relevantParameters formatVersion="1">
@@ -21,13 +21,133 @@
         <entry name="included_phases">
           <array>
             <item>
-              <string>Pre-operative</string>
+              <object>
+                <entry name="phase">
+                  <string>Pre-operative</string>
+                </entry>
+                <entry name="end_event">
+                  <object>
+                    <entry name="event_fields">
+                      <array>
+                        <item>
+                          <string>epic.EVENTS.EVENT</string>
+                        </item>
+                        <item>
+                          <string>event</string>
+                        </item>
+                        <item>
+                          <string>events</string>
+                        </item>
+                      </array>
+                    </entry>
+                    <entry name="phrases">
+                      <array>
+                        <item>
+                          <string>start anesthesie</string>
+                        </item>
+                        <item>
+                          <string>start anesthesia</string>
+                        </item>
+                        <item>
+                          <string>start anaesthesia</string>
+                        </item>
+                        <item>
+                          <string>start surgery</string>
+                        </item>
+                        <item>
+                          <string>incision</string>
+                        </item>
+                      </array>
+                    </entry>
+                  </object>
+                </entry>
+              </object>
             </item>
             <item>
-              <string>During-operative</string>
+              <object>
+                <entry name="phase">
+                  <string>During-operative</string>
+                </entry>
+                <entry name="end_event">
+                  <object>
+                    <entry name="event_fields">
+                      <array>
+                        <item>
+                          <string>epic.EVENTS.EVENT</string>
+                        </item>
+                        <item>
+                          <string>event</string>
+                        </item>
+                        <item>
+                          <string>events</string>
+                        </item>
+                      </array>
+                    </entry>
+                    <entry name="phrases">
+                      <array>
+                        <item>
+                          <string>Afronden zorg</string>
+                        </item>
+                        <item>
+                          <string>Stop anesthesie</string>
+                        </item>
+                        <item>
+                          <string>Vertrek naar IC (of_Afdeling)</string>
+                        </item>
+                      </array>
+                    </entry>
+                  </object>
+                </entry>
+              </object>
             </item>
             <item>
-              <string>Post-operative</string>
+              <object>
+                <entry name="phase">
+                  <string>Post-operative</string>
+                </entry>
+                <entry name="end_event">
+                  <object>
+                    <entry name="event_fields">
+                      <array>
+                        <item>
+                          <string>epic.EVENTS.EVENT</string>
+                        </item>
+                        <item>
+                          <string>event</string>
+                        </item>
+                        <item>
+                          <string>events</string>
+                        </item>
+                      </array>
+                    </entry>
+                    <entry name="phrases">
+                      <array>
+                        <item>
+                          <string>admission end</string>
+                        </item>
+                        <item>
+                          <string>Getekend bezoek</string>
+                        </item>
+                        <item>
+                          <string>hospital discharge</string>
+                        </item>
+                        <item>
+                          <string>discharge from hospital</string>
+                        </item>
+                        <item>
+                          <string>discharge home</string>
+                        </item>
+                        <item>
+                          <string>ontslag naar huis</string>
+                        </item>
+                        <item>
+                          <string>ontslag uit ziekenhuis</string>
+                        </item>
+                      </array>
+                    </entry>
+                  </object>
+                </entry>
+              </object>
             </item>
           </array>
         </entry>
@@ -37,7 +157,7 @@
         <entry name="missing_value_tokens">
           <array>
             <item>
-              <string />
+              <string></string>
             </item>
             <item>
               <string>na</string>
@@ -79,24 +199,8 @@
             </entry>
           </object>
         </entry>
-        <entry name="preoperative_start_event_patterns">
-          <array>
-            <item>
-              <string>start anesthesie</string>
-            </item>
-            <item>
-              <string>start anesthesia</string>
-            </item>
-            <item>
-              <string>start anaesthesia</string>
-            </item>
-            <item>
-              <string>start surgery</string>
-            </item>
-            <item>
-              <string>incision</string>
-            </item>
-          </array>
+        <entry name="export_time_series">
+          <boolean>true</boolean>
         </entry>
         <entry name="patient_outcome_rules">
           <object>
@@ -270,19 +374,6 @@
             </entry>
           </object>
         </entry>
-        <entry name="catalog_phases">
-          <array>
-            <item>
-              <string>Pre-operative</string>
-            </item>
-            <item>
-              <string>During-operative</string>
-            </item>
-            <item>
-              <string>Post-operative</string>
-            </item>
-          </array>
-        </entry>
         <entry name="catalog_field_definitions">
           <object>
             <entry name="exact_field_names">
@@ -386,6 +477,7 @@
       </settings>
       <pre>
         <class name="epic.DEMOGRAPHICS">
+          <timed>false</timed>
           <parameter id="age">
             <entry name="name">
               <string>Age</string>
@@ -423,10 +515,10 @@
               <string>numeric</string>
             </entry>
             <entry name="unit">
-              <null />
+              <null></null>
             </entry>
             <entry name="value_range">
-              <null />
+              <null></null>
             </entry>
             <entry name="source_status">
               <string>mapped; verify availability and units in full cohort</string>
@@ -478,10 +570,10 @@
               <string>categorical</string>
             </entry>
             <entry name="unit">
-              <null />
+              <null></null>
             </entry>
             <entry name="value_range">
-              <null />
+              <null></null>
             </entry>
             <entry name="source_status">
               <string>mapped; verify availability and units in full cohort</string>
@@ -533,10 +625,10 @@
               <string>numeric</string>
             </entry>
             <entry name="unit">
-              <null />
+              <null></null>
             </entry>
             <entry name="value_range">
-              <null />
+              <null></null>
             </entry>
             <entry name="source_status">
               <string>mapped; verify availability and units in full cohort</string>
@@ -588,10 +680,10 @@
               <string>numeric</string>
             </entry>
             <entry name="unit">
-              <null />
+              <null></null>
             </entry>
             <entry name="value_range">
-              <null />
+              <null></null>
             </entry>
             <entry name="source_status">
               <string>mapped; verify availability and units in full cohort</string>
@@ -643,10 +735,10 @@
               <string>numeric</string>
             </entry>
             <entry name="unit">
-              <null />
+              <null></null>
             </entry>
             <entry name="value_range">
-              <null />
+              <null></null>
             </entry>
             <entry name="source_status">
               <string>mapped; verify availability and units in full cohort</string>
@@ -698,10 +790,10 @@
               <string>ordinal</string>
             </entry>
             <entry name="unit">
-              <null />
+              <null></null>
             </entry>
             <entry name="value_range">
-              <null />
+              <null></null>
             </entry>
             <entry name="source_status">
               <string>mapped; verify availability and units in full cohort</string>
@@ -754,10 +846,10 @@
             <string>categorical</string>
           </entry>
           <entry name="unit">
-            <null />
+            <null></null>
           </entry>
           <entry name="value_range">
-            <null />
+            <null></null>
           </entry>
           <entry name="source_status">
             <string>mapped; verify availability and units in full cohort</string>
@@ -813,7 +905,7 @@
               <string>umol/L</string>
             </entry>
             <entry name="value_range">
-              <null />
+              <null></null>
             </entry>
             <entry name="source_status">
               <string>mapped; verify availability and units in full cohort</string>
@@ -874,7 +966,7 @@
               <string>mmol/L</string>
             </entry>
             <entry name="value_range">
-              <null />
+              <null></null>
             </entry>
             <entry name="source_status">
               <string>mapped; verify availability and units in full cohort</string>
@@ -891,7 +983,156 @@
           </parameter>
         </class>
       </pre>
-      <during />
+      <during>
+        <availableClasses>
+          <className>epic.3OZP-05_intellivu</className>
+          <className>epic.3OZP-07_intellivu</className>
+          <className>epic.3OZP-08_intellivu</className>
+          <className>epic.3OZP-10_intellivu</className>
+          <className>epic.3OZP-13_intellivu</className>
+          <className>epic.AN-07_intellivu</className>
+          <className>epic.AN-07_primus</className>
+          <className>epic.AN-12_intellivu</className>
+          <className>epic.AN-12_primus</className>
+          <className>epic.AN-13_intellivu</className>
+          <className>epic.AN-13_jet</className>
+          <className>epic.AN-13_primus</className>
+          <className>epic.AN-14_foresight</className>
+          <className>epic.AN-14_intellivu</className>
+          <className>epic.AN-14_jet</className>
+          <className>epic.AN-14_primus</className>
+          <className>epic.AN-15_cardiohelp</className>
+          <className>epic.AN-15_inomax</className>
+          <className>epic.AN-15_intellivu</className>
+          <className>epic.AN-15_invosnirs</className>
+          <className>epic.AN-15_masroot</className>
+          <className>epic.AN-15_primus</className>
+          <className>epic.AN-16_intellivu</className>
+          <className>epic.AN-16_primus</className>
+          <className>epic.AN-19_intellivu</className>
+          <className>epic.AN-19_jet</className>
+          <className>epic.AN-19_primus</className>
+          <className>epic.AN-19_tcm5</className>
+          <className>epic.AN-20_intellivu</className>
+          <className>epic.AN-20_masroot</className>
+          <className>epic.AN-20_primus</className>
+          <className>epic.AN-21_intellivu</className>
+          <className>epic.AN-21_primus</className>
+          <className>epic.AN-24_foresight</className>
+          <className>epic.AN-24_intellivu</className>
+          <className>epic.AN-24_primus</className>
+          <className>epic.AN-26_intellivu</className>
+          <className>epic.AN-26_zeus</className>
+          <className>epic.AN-32_intellivu</className>
+          <className>epic.AN-32_zeus</className>
+          <className>epic.AN-35_intellivu</className>
+          <className>epic.AN-35_primus</className>
+          <className>epic.BKZ-08 Intellivue</className>
+          <className>epic.DEMOGRAPHICS</className>
+          <className>epic.EVENTS</className>
+          <className>epic.FLUIDS_IN</className>
+          <className>epic.FLUIDS_OUT</className>
+          <className>epic.GW-Andorra</className>
+          <className>epic.GW-Monaco</className>
+          <className>epic.GW-Nicosia</className>
+          <className>epic.GW-Parijs</className>
+          <className>epic.GW-Pristina</className>
+          <className>epic.GW-Sofia</className>
+          <className>epic.GW-Stockholm</className>
+          <className>epic.GW-Tirana</className>
+          <className>epic.GW-Vaduz</className>
+          <className>epic.GW-Valletta</className>
+          <className>epic.GW-Vaticaanstad</className>
+          <className>epic.HLM-1 Sorin S5</className>
+          <className>epic.HLM-1 Vamos</className>
+          <className>epic.HLM-2 Sorin S5</className>
+          <className>epic.HLM-2 Vamos</className>
+          <className>epic.HLM-3 Sorin S5</className>
+          <className>epic.HLM-3 Vamos</className>
+          <className>epic.HLM-4 Sorin S5</className>
+          <className>epic.HLM-4 Vamos</className>
+          <className>epic.HLM-7 Sorin S5</className>
+          <className>epic.HLM-7 Vamos</className>
+          <className>epic.INGREEP</className>
+          <className>epic.LAB</className>
+          <className>epic.MEDICATION</className>
+          <className>epic.OZKP-02_intellivu</className>
+          <className>epic.OZKP-03_intellivu</className>
+          <className>epic.OZKP-06_intellivu</className>
+          <className>epic.PER-01_intellivu</className>
+          <className>epic.PER-01_invosnirs</className>
+          <className>epic.PER-01_masroot</className>
+          <className>epic.PER-01_perseus</className>
+          <className>epic.PER-02_inomax</className>
+          <className>epic.PER-02_intellivu</className>
+          <className>epic.PER-02_invosnirs</className>
+          <className>epic.PER-02_masroot</className>
+          <className>epic.PER-02_perseus</className>
+          <className>epic.PER-03_intellivu</className>
+          <className>epic.PER-03_masroot</className>
+          <className>epic.PER-03_perseus</className>
+          <className>epic.PER-05_intellivu</className>
+          <className>epic.PER-05_perseus</className>
+          <className>epic.UMCG ICK-B17 Carefusion AVEA</className>
+          <className>epic.UMCG ICK-B17 Invos NIRS</className>
+          <className>epic.UMCG ICK-B17 Philips Intellivue</className>
+          <className>epic.UMCG ICK-G02 Carefusion AVEA</className>
+          <className>epic.UMCG ICK-G02 INOmax DS IR</className>
+          <className>epic.UMCG ICK-G02 Philips Intellivue</className>
+        </availableClasses>
+
+        <class name="epic.LAB">
+          <parameter id="during_creatinine">
+            <entry name="name">
+              <string>During-operative creatinine</string>
+            </entry>
+            <entry name="role">
+              <string>During-operative observation (not a predictor or outcome)</string>
+            </entry>
+            <entry name="priority">
+              <string>Review</string>
+            </entry>
+            <entry name="source_fields">
+              <array>
+                <item>
+                  <string>epic.LAB.Kreatinine (umol/L)</string>
+                </item>
+              </array>
+            </entry>
+            <entry name="exact_field_names">
+              <array>
+                <item>
+                  <string>epic.LAB.Kreatinine (umol/L)</string>
+                </item>
+              </array>
+            </entry>
+            <entry name="clinical_parameter">
+              <string>During-operative creatinine</string>
+            </entry>
+            <entry name="extraction_definition">
+              <string>Latest numeric reading from operation start up to (not including) operation end; optionally export all readings at phase-relative times.</string>
+            </entry>
+            <entry name="parameter_type">
+              <string>time_series_numeric</string>
+            </entry>
+            <entry name="unit">
+              <string>umol/L</string>
+            </entry>
+            <entry name="value_range">
+              <null></null>
+            </entry>
+            <entry name="source_status">
+              <string>Illustrative mapping; verify availability, timing, and units before clinical use</string>
+            </entry>
+            <entry name="workbook_row">
+              <null></null>
+            </entry>
+            <entry name="workbook_exact_field_entry">
+              <null></null>
+            </entry>
+          </parameter>
+        </class>
+      </during>
       <post>
         <parameter id="aki_kdigo_stage" measurementOrder="3">
           <entry name="name">
@@ -1021,19 +1262,19 @@
             <array />
           </entry>
           <entry name="extraction_definition">
-            <string>Need hospital admission/discharge dates from another source</string>
+            <string>Difference between configured operation-end and post-operative-end event timestamps.</string>
           </entry>
           <entry name="parameter_type">
             <string>derived_duration</string>
           </entry>
           <entry name="unit">
-            <null />
+            <string>days</string>
           </entry>
           <entry name="value_range">
-            <null />
+            <null></null>
           </entry>
           <entry name="source_status">
-            <string>unresolved; workbook says not present in q_umcg_aki_marco postoperative ICU dataset</string>
+            <string>Derived from configured operation-end and post-operative-end event markers; verify those markers against the study data.</string>
           </entry>
           <entry name="workbook_row">
             <number>38</number>
@@ -1047,20 +1288,31 @@
                 <string>max</string>
               </entry>
               <entry name="window_hours">
-                <null />
+                <null></null>
               </entry>
               <entry name="notes">
-                <string>No confirmed source field.</string>
+                <string>Derived duration uses the configured operation-end and post-operative-end events.</string>
+              </entry>
+              <entry name="duration">
+                <object>
+                  <entry name="method"><string>phase_boundary_interval</string></entry>
+<entry name="aggregation"><string>difference</string></entry>
+                  <entry name="start_boundary"><string>operation_end</string></entry>
+                  <entry name="end_boundary"><string>postoperative_end</string></entry>
+                  <entry name="unit"><string>days</string></entry>
+                  <entry name="precision"><number>2</number></entry>
+                  <entry name="label"><string>Time in hospital after operation</string></entry>
+                </object>
               </entry>
             </object>
           </entry>
           <entry name="outcome_criteria">
             <object>
               <entry name="success">
-                <null />
+                <null></null>
               </entry>
               <entry name="failure">
-                <null />
+                <null></null>
               </entry>
               <entry name="status">
                 <string>pending_clinical_definition</string>
@@ -1105,19 +1357,19 @@
             </array>
           </entry>
           <entry name="extraction_definition">
-            <string>Derive ICU LOS = discharge datetime − admission datetime; match the ICU episode temporally to the cardiac operation</string>
+            <string>Compute discharge datetime minus admission datetime from the configured ICU fields; include only intervals overlapping the configured operation-to-post-operative-end window.</string>
           </entry>
           <entry name="parameter_type">
             <string>derived_duration</string>
           </entry>
           <entry name="unit">
-            <null />
+            <string>days</string>
           </entry>
           <entry name="value_range">
-            <null />
+            <null></null>
           </entry>
           <entry name="source_status">
-            <string>source fields identified; temporal matching/derivation not implemented</string>
+            <string>Candidate source fields are configured; confirm field contents, datetime format, and timezone against the data dictionary before cohort use.</string>
           </entry>
           <entry name="workbook_row">
             <number>37</number>
@@ -1126,7 +1378,7 @@
             <string>q_umcg_aki_marco.adm_ic_admdate; q_umcg_aki_marco.adm_ic_disdate</string>
           </entry>
           <entry name="unit_note">
-            <string>Confirm output unit for datetime subtraction before use.</string>
+            <string>Datetime differences are displayed in the configured unit; source date values are not shown in the dashboard.</string>
           </entry>
           <entry name="measurement">
             <object>
@@ -1137,20 +1389,35 @@
                 <string>max</string>
               </entry>
               <entry name="window_hours">
-                <null />
+                <null></null>
               </entry>
               <entry name="notes">
-                <string>Not calculated until admission/discharge dates can be matched to the operation.</string>
+                <string>Calculate only when both configured datetime fields and the matching operation window are available.</string>
+              </entry>
+              <entry name="duration">
+                <object>
+                  <entry name="method"><string>field_interval</string></entry>
+<entry name="aggregation"><string>sum_overlaps</string></entry>
+                  <entry name="start_field"><string>q_umcg_aki_marco.adm_ic_admdate</string></entry>
+                  <entry name="end_field"><string>q_umcg_aki_marco.adm_ic_disdate</string></entry>
+                  <entry name="match_start_boundary"><string>operation_start</string></entry>
+                  <entry name="match_end_boundary"><string>postoperative_end</string></entry>
+                  <entry name="datetime_format"><string>iso8601</string></entry>
+                  <entry name="timezone"><string>Europe/Amsterdam</string></entry>
+                  <entry name="unit"><string>days</string></entry>
+                  <entry name="precision"><number>2</number></entry>
+                  <entry name="label"><string>Time in IC</string></entry>
+                </object>
               </entry>
             </object>
           </entry>
           <entry name="outcome_criteria">
             <object>
               <entry name="success">
-                <null />
+                <null></null>
               </entry>
               <entry name="failure">
-                <null />
+                <null></null>
               </entry>
               <entry name="status">
                 <string>pending_clinical_definition</string>
@@ -1195,7 +1462,7 @@
             <string>boolean</string>
           </entry>
           <entry name="unit">
-            <null />
+            <null></null>
           </entry>
           <entry name="value_range">
             <object>
@@ -1225,7 +1492,7 @@
                 <string>boolean</string>
               </entry>
               <entry name="window_hours">
-                <null />
+                <null></null>
               </entry>
               <entry name="notes">
                 <string>Mortality horizon is unverified.</string>
@@ -1297,15 +1564,15 @@
             <string>numeric</string>
           </entry>
           <entry name="unit">
-            <null />
+            <null></null>
           </entry>
           <entry name="value_range">
             <object>
               <entry name="min">
-                <null />
+                <null></null>
               </entry>
               <entry name="max">
-                <null />
+                <null></null>
               </entry>
             </object>
           </entry>
@@ -1313,7 +1580,7 @@
             <string>User-added from CSV header; not in source workbook. Confirm units and follow-up period before research use.</string>
           </entry>
           <entry name="workbook_row">
-            <null />
+            <null></null>
           </entry>
           <entry name="workbook_exact_field_entry">
             <string>Not in source workbook (user-added field)</string>
@@ -1330,7 +1597,7 @@
                 <string>patient</string>
               </entry>
               <entry name="window_hours">
-                <null />
+                <null></null>
               </entry>
               <entry name="notes">
                 <string>Patient-level field: any nonnegative number, including 0, records a death; missing values do not establish survival. Follow-up horizon unknown.</string>
@@ -1340,7 +1607,7 @@
           <entry name="outcome_criteria">
             <object>
               <entry name="success">
-                <null />
+                <null></null>
               </entry>
               <entry name="failure">
                 <object>
@@ -1395,10 +1662,10 @@
             <string>numeric_score</string>
           </entry>
           <entry name="unit">
-            <null />
+            <null></null>
           </entry>
           <entry name="value_range">
-            <null />
+            <null></null>
           </entry>
           <entry name="source_status">
             <string>mapped; verify availability and units in full cohort</string>
@@ -1418,17 +1685,17 @@
                 <string>max</string>
               </entry>
               <entry name="window_hours">
-                <null />
+                <null></null>
               </entry>
             </object>
           </entry>
           <entry name="outcome_criteria">
             <object>
               <entry name="success">
-                <null />
+                <null></null>
               </entry>
               <entry name="failure">
-                <null />
+                <null></null>
               </entry>
               <entry name="status">
                 <string>pending_clinical_definition</string>
@@ -1477,7 +1744,7 @@
               <string>umol/L</string>
             </entry>
             <entry name="value_range">
-              <null />
+              <null></null>
             </entry>
             <entry name="source_status">
               <string>mapped; verify availability and units in full cohort</string>
@@ -1504,10 +1771,10 @@
             <entry name="outcome_criteria">
               <object>
                 <entry name="success">
-                  <null />
+                  <null></null>
                 </entry>
                 <entry name="failure">
-                  <null />
+                  <null></null>
                 </entry>
                 <entry name="status">
                   <string>pending_clinical_definition</string>
@@ -1545,7 +1812,7 @@
             <string>boolean</string>
           </entry>
           <entry name="unit">
-            <null />
+            <null></null>
           </entry>
           <entry name="value_range">
             <object>
@@ -1572,7 +1839,7 @@
                 <string>max</string>
               </entry>
               <entry name="window_hours">
-                <null />
+                <null></null>
               </entry>
               <entry name="notes">
                 <string>No confirmed source field.</string>
@@ -1582,10 +1849,10 @@
           <entry name="outcome_criteria">
             <object>
               <entry name="success">
-                <null />
+                <null></null>
               </entry>
               <entry name="failure">
-                <null />
+                <null></null>
               </entry>
               <entry name="status">
                 <string>pending_clinical_definition</string>
@@ -1634,7 +1901,7 @@
               <string>ml</string>
             </entry>
             <entry name="value_range">
-              <null />
+              <null></null>
             </entry>
             <entry name="source_status">
               <string>mapped; verify availability and units in full cohort</string>
@@ -1664,10 +1931,10 @@
             <entry name="outcome_criteria">
               <object>
                 <entry name="success">
-                  <null />
+                  <null></null>
                 </entry>
                 <entry name="failure">
-                  <null />
+                  <null></null>
                 </entry>
                 <entry name="status">
                   <string>pending_clinical_definition</string>
@@ -1713,10 +1980,10 @@
             <string>numeric_score</string>
           </entry>
           <entry name="unit">
-            <null />
+            <null></null>
           </entry>
           <entry name="value_range">
-            <null />
+            <null></null>
           </entry>
           <entry name="source_status">
             <string>mapped; verify availability and units in full cohort</string>
@@ -1736,17 +2003,17 @@
                 <string>max</string>
               </entry>
               <entry name="window_hours">
-                <null />
+                <null></null>
               </entry>
             </object>
           </entry>
           <entry name="outcome_criteria">
             <object>
               <entry name="success">
-                <null />
+                <null></null>
               </entry>
               <entry name="failure">
-                <null />
+                <null></null>
               </entry>
               <entry name="status">
                 <string>pending_clinical_definition</string>
@@ -1794,7 +2061,7 @@
             <string>days</string>
           </entry>
           <entry name="value_range">
-            <null />
+            <null></null>
           </entry>
           <entry name="source_status">
             <string>mapped; verify availability and units in full cohort</string>
@@ -1811,7 +2078,7 @@
                 <string>max</string>
               </entry>
               <entry name="window_hours">
-                <null />
+                <null></null>
               </entry>
               <entry name="units">
                 <string>days</string>
@@ -1821,10 +2088,10 @@
           <entry name="outcome_criteria">
             <object>
               <entry name="success">
-                <null />
+                <null></null>
               </entry>
               <entry name="failure">
-                <null />
+                <null></null>
               </entry>
               <entry name="status">
                 <string>pending_clinical_definition</string>
@@ -1858,6 +2125,30 @@
       <distributions>true</distributions>
       <phase>all</phase>
       <bins>20</bins>
+      <theme>dark</theme>
+      <missingnessByPatient>
+        <run>true</run>
+        <output>results/preoperative_missingness_heatmap.html</output>
+      </missingnessByPatient>
+      <timeSeries>
+        <run>true</run>
+        <groupBy>parameter</groupBy>
+        <parameterIds />
+        <classNames />
+        <patientIds />
+        <outputDirectory>results/time_series_plots</outputDirectory>
+      </timeSeries>
+      <patientTimeline>
+        <run>true</run>
+        <patientIds />
+        <compareAllPatients>false</compareAllPatients>
+        <includeStudyPlots>true</includeStudyPlots>
+        <layout>
+          <chartHeight>740</chartHeight>
+          <panelMaxHeight>320</panelMaxHeight>
+        </layout>
+        <output>results/patient_timeline_dashboard.html</output>
+      </patientTimeline>
     </plotting>
   </preprocessing>
   <model>
@@ -1885,7 +2176,7 @@
       </novelData>
       <plotting>
         <run>true</run>
-        <output>results/perceptron_confusion_matrix.png</output>
+        <output>results/perceptron_confusion_matrix.html</output>
       </plotting>
     </perceptron>
   </model>

@@ -20,24 +20,171 @@ class ParameterMapXmlTests(unittest.TestCase):
                 self.assertIsNone(settings.find("entry[@name='parameters']"))
                 self.assertIsNone(settings.find("entry[@name='postoperative_measurements']"))
                 definitions = [node for phase in ("pre", "during", "post")
-                               for child in relevant.find(phase)
-                               for node in (list(child) if child.tag == "class" else [child])]
-                self.assertEqual(len(definitions), 20)
-                self.assertEqual(len({node.get("id") for node in definitions}), 20)
+                               for child in relevant.find(phase) if child.tag != "availableClasses"
+                               for node in (list(child.findall("parameter")) if child.tag == "class" else [child])]
+                self.assertEqual(len(definitions), 21)
+                self.assertEqual(len({node.get("id") for node in definitions}), 21)
                 self.assertTrue(all(node.tag == "parameter" and node.find("entry[@name='phase']") is None
                                     and node.find("entry[@name='id']") is None for node in definitions))
                 death = next(node for node in definitions if node.get("id") == "recorded_death_days")
                 self.assertIsNotNone(death.find("entry[@name='measurement']"))
                 self.assertIsNotNone(death.find("entry[@name='outcome_criteria']"))
 
-    def test_runtime_map_loads_only_pre_and_postoperative_parameters(self):
+    def test_runtime_map_loads_pre_during_and_postoperative_parameters(self):
         mapping = load_parameter_map(PARAMETER_MAP)
         self.assertEqual(mapping["included_phases"], ["Pre-operative", "During-operative", "Post-operative"])
         self.assertEqual(mapping["catalog_phases"], ["Pre-operative", "During-operative", "Post-operative"])
         self.assertEqual({item["phase"] for item in mapping["parameters"]},
-                         {"Pre-operative", "Post-operative"})
+                         {"Pre-operative", "During-operative", "Post-operative"})
         self.assertEqual(sum(item["phase"] == "Pre-operative" for item in mapping["parameters"]), 9)
+        self.assertEqual(sum(item["phase"] == "During-operative" for item in mapping["parameters"]), 1)
         self.assertEqual(sum(item["phase"] == "Post-operative" for item in mapping["parameters"]), 11)
+
+    def test_demographics_class_declares_timestamps_unavailable(self):
+        for name in ("pipeline.xml", "pipeline.template.xml"):
+            with self.subTest(name=name):
+                path = ROOT / "config" / name
+                demographic_class = ET.parse(path).getroot().find(
+                    "preprocessing/relevantParameters/pre/class[@name='epic.DEMOGRAPHICS']"
+                )
+                self.assertEqual(demographic_class.findtext("timed"), "false")
+                mapping = load_parameter_map(path)
+                self.assertIn("epic.DEMOGRAPHICS", mapping["timeless_class_names"])
+                self.assertFalse(next(p for p in mapping["parameters"] if p["id"] == "age")["timed"])
+                self.assertTrue(next(p for p in mapping["parameters"] if p["id"] == "during_creatinine")["timed"])
+
+    def test_during_class_inventory_is_loaded_for_operation_timeline(self):
+        inventories = []
+        for name in ("pipeline.xml", "pipeline.template.xml"):
+            mapping = load_parameter_map(ROOT / "config" / name)
+            classes = mapping.get("during_class_names", [])
+            inventories.append(classes)
+            with self.subTest(name=name):
+                self.assertEqual(len(classes), 94)
+                self.assertEqual(len({value.casefold() for value in classes}), 94)
+                self.assertEqual(classes, sorted(classes, key=str.casefold))
+                self.assertIn("epic.EVENTS", classes)
+                self.assertIn("epic.LAB", classes)
+                self.assertIn("epic.AN-07_intellivu", classes)
+
+        self.assertEqual(inventories[0], inventories[1])
+
+    def test_invalid_during_class_inventory_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "invalid-classes.xml"
+            tree = ET.parse(ROOT / "config/pipeline.template.xml")
+            inventory = tree.getroot().find("preprocessing/relevantParameters/during/availableClasses")
+            ET.SubElement(inventory, "className").text = "epic.LAB"
+            tree.write(path, encoding="utf-8", xml_declaration=True)
+            with self.assertRaisesRegex(ValueError, "cannot contain duplicates"):
+                load_parameter_map(path)
+
+            tree = ET.parse(ROOT / "config/pipeline.template.xml")
+            inventory = tree.getroot().find("preprocessing/relevantParameters/during/availableClasses")
+            inventory[0].text = "LAB"
+            tree.write(path, encoding="utf-8", xml_declaration=True)
+            with self.assertRaisesRegex(ValueError, "exact Epic class names"):
+                load_parameter_map(path)
+
+    def test_runtime_map_preserves_explicit_class_for_time_series_plots(self):
+        mapping = load_parameter_map(PARAMETER_MAP)
+        parameters = {item["id"]: item for item in mapping["parameters"]}
+        self.assertEqual(parameters["during_creatinine"]["class_name"], "epic.LAB")
+        self.assertNotIn("class_name", parameters["operation_diagnosis_proxy"])
+
+    def test_operation_boundaries_are_configured_not_hardcoded(self):
+        for name in ("pipeline.xml", "pipeline.template.xml"):
+            mapping = load_parameter_map(ROOT / "config" / name)
+            boundaries = mapping["phase_boundaries"]
+            self.assertEqual(boundaries["operation_start"]["event_fields"], ["epic.EVENTS.EVENT", "event", "events"])
+            self.assertIn("start anesthesie", boundaries["operation_start"]["phrases"])
+            self.assertEqual(boundaries["operation_end"]["phrases"], [
+                "Afronden zorg", "Stop anesthesie", "Vertrek naar IC (of_Afdeling)",
+            ])
+            self.assertNotIn("preoperative_start_event_patterns", mapping)
+
+    def test_phase_end_events_are_children_of_each_included_phase(self):
+        for name in ("pipeline.xml", "pipeline.template.xml"):
+            with self.subTest(name=name):
+                root = ET.parse(ROOT / "config" / name).getroot()
+                settings = root.find("preprocessing/relevantParameters/settings")
+                self.assertIsNone(settings.find("entry[@name='phase_boundaries']"))
+                self.assertIsNone(settings.find("entry[@name='catalog_phases']"))
+                items = settings.find("entry[@name='included_phases']/array").findall("item/object")
+                self.assertEqual([item.find("entry[@name='phase']/string").text for item in items],
+                                 ["Pre-operative", "During-operative", "Post-operative"])
+                self.assertEqual(items[0].find("entry[@name='end_event']/object/entry[@name='phrases']/array/item/string").text,
+                                 "start anesthesie")
+                self.assertEqual([node.text for node in items[1].findall("entry[@name='end_event']/object/entry[@name='phrases']/array/item/string")],
+                                 ["Afronden zorg", "Stop anesthesie", "Vertrek naar IC (of_Afdeling)"])
+                self.assertEqual(
+                    [node.text for node in items[2].findall("entry[@name='end_event']/object/entry[@name='phrases']/array/item/string")],
+                    ["admission end", "Getekend bezoek", "hospital discharge", "discharge from hospital",
+                     "discharge home", "ontslag naar huis", "ontslag uit ziekenhuis"],
+                )
+                mapping = load_parameter_map(ROOT / "config" / name)
+                self.assertEqual(mapping["phase_boundaries"]["operation_start"]["event_fields"],
+                                 ["epic.EVENTS.EVENT", "event", "events"])
+                self.assertEqual(mapping["phase_boundaries"]["postoperative_end"]["phrases"][0],
+                                 "admission end")
+
+    def test_postoperative_end_and_stay_duration_rules_are_xml_configured(self):
+        for name in ("pipeline.xml", "pipeline.template.xml"):
+            with self.subTest(name=name):
+                mapping = load_parameter_map(ROOT / "config" / name)
+                boundary = mapping["phase_boundaries"]["postoperative_end"]
+                self.assertEqual(boundary["event_fields"], ["epic.EVENTS.EVENT", "event", "events"])
+                self.assertIn("hospital discharge", boundary["phrases"])
+                self.assertIn("admission end", boundary["phrases"])
+                self.assertIn("Getekend bezoek", boundary["phrases"])
+                measurements = {item["id"]: item for item in mapping["postoperative_measurements"]}
+                icu = measurements["icu_los"]["duration"]
+                self.assertEqual(icu["method"], "field_interval")
+                self.assertEqual(icu["aggregation"], "sum_overlaps")
+                self.assertEqual(icu["start_field"], "q_umcg_aki_marco.adm_ic_admdate")
+                self.assertEqual(icu["end_field"], "q_umcg_aki_marco.adm_ic_disdate")
+                self.assertEqual(icu["match_start_boundary"], "operation_start")
+                self.assertEqual(icu["match_end_boundary"], "postoperative_end")
+                self.assertEqual(icu["datetime_format"], "iso8601")
+                self.assertEqual(icu["timezone"], "Europe/Amsterdam")
+                self.assertEqual(icu["unit"], "days")
+                hospital = measurements["hospital_los"]["duration"]
+                self.assertEqual(hospital["method"], "phase_boundary_interval")
+                self.assertEqual(hospital["aggregation"], "difference")
+                self.assertEqual(hospital["start_boundary"], "operation_end")
+                self.assertEqual(hospital["end_boundary"], "postoperative_end")
+                self.assertEqual(hospital["unit"], "days")
+
+    def test_invalid_phase_item_boundary_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            tree = ET.parse(ROOT / "config/pipeline.template.xml")
+            items = tree.getroot().findall(
+                "preprocessing/relevantParameters/settings/entry[@name='included_phases']/array/item/object"
+            )
+            phrases = items[1].find("entry[@name='end_event']/object/entry[@name='phrases']/array")
+            phrases.clear()
+            path = Path(temporary) / "invalid.xml"
+            tree.write(path, encoding="utf-8", xml_declaration=True)
+            with self.assertRaisesRegex(ValueError, "phase_boundaries.*operation_end.*phrases"):
+                load_parameter_map(path)
+            ET.SubElement(ET.SubElement(phrases, "item"), "string").text = "Stop anesthesie"
+            end_event = items[2].find("entry[@name='end_event']")
+            for child in list(end_event):
+                end_event.remove(child)
+            ET.SubElement(end_event, "string").text = "unexpected"
+            tree.write(path, encoding="utf-8", xml_declaration=True)
+            with self.assertRaisesRegex(ValueError, "phase_boundaries.postoperative_end needs event_fields and phrases"):
+                load_parameter_map(path)
+
+    def test_incomplete_operation_boundary_config_is_rejected(self):
+        from src.parameter_map import write_parameter_map
+        with tempfile.TemporaryDirectory() as temporary:
+            mapping = load_parameter_map(ROOT / "config/pipeline.template.xml")
+            mapping["phase_boundaries"]["operation_end"]["phrases"] = []
+            path = Path(temporary) / "incomplete.xml"
+            write_parameter_map(path, mapping)
+            with self.assertRaisesRegex(ValueError, "phase_boundaries.*operation_end.*phrases"):
+                load_parameter_map(path)
 
     def test_measurement_order_and_source_inheritance_remain_stable(self):
         mapping = load_parameter_map(PARAMETER_MAP)

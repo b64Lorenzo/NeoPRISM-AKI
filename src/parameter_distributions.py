@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from src.csv_utils import number_component
 from src.parameter_map import load_parameter_map
 from src.pipeline_config import select_parameter_map
+from src.plotly_output import plotly_template, write_plotly_html
 
 
 def _number(value: object) -> float | None:
@@ -32,13 +33,12 @@ def _plot_distribution(
     bins: int,
     *,
     numeric_expected: bool | None = None,
+    theme: str = "light",
 ) -> tuple[str, list[float], Counter[str]]:
     try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
+        import plotly.graph_objects as go
     except ImportError as error:
-        raise RuntimeError("Distribution plots require Matplotlib; install requirements.txt") from error
+        raise RuntimeError("Distribution plots require Plotly; install requirements.txt") from error
 
     observed = [value for value in values if value.strip()]
     numeric = [_number(value) for value in observed]
@@ -47,38 +47,67 @@ def _plot_distribution(
         if numeric_expected is None
         else numeric_expected
     )
-    figure, axis = plt.subplots(figsize=(7, 4.5))
+    figure = go.Figure()
     categories: Counter[str] = Counter()
     numeric_values = [value for value in numeric if value is not None] if is_numeric else []
 
     if not observed:
         kind = "no_data"
-        axis.text(0.5, 0.5, "No mapped values available", ha="center", va="center", transform=axis.transAxes)
-        axis.set_axis_off()
+        message = "No mapped values available"
     elif is_numeric and not numeric_values:
         kind = "no_data"
-        axis.text(0.5, 0.5, "No numeric values available", ha="center", va="center", transform=axis.transAxes)
-        axis.set_axis_off()
+        message = "No numeric values available"
     elif is_numeric:
         kind = "numeric"
-        axis.hist(numeric_values, bins=bins, color="#4c78a8", edgecolor="white")
-        axis.set_xlabel("Recorded value")
-        axis.set_ylabel("Patient count")
+        message = ""
+        figure.add_trace(
+            go.Histogram(
+                x=numeric_values,
+                nbinsx=bins,
+                marker_color="#4c78a8",
+                marker_line_color="white",
+                hovertemplate="Value: %{x}<br>Patient count: %{y}<extra></extra>",
+            )
+        )
+        figure.update_xaxes(title_text="Recorded value")
+        figure.update_yaxes(title_text="Patient count")
     else:
         kind = "categorical"
+        message = ""
         categories = Counter(observed)
         ordered = sorted(categories.items(), key=lambda item: (-item[1], item[0]))
-        axis.bar([item[0] for item in ordered], [item[1] for item in ordered], color="#4c78a8")
-        axis.set_xlabel("Recorded category")
-        axis.set_ylabel("Patient count")
-        axis.tick_params(axis="x", labelrotation=45)
-        for tick in axis.get_xticklabels():
-            tick.set_ha("right")
+        labels = [item[0] for item in ordered]
+        figure.add_trace(
+            go.Bar(
+                x=labels,
+                y=[item[1] for item in ordered],
+                marker_color="#4c78a8",
+                hovertemplate="Category: %{x}<br>Patient count: %{y}<extra></extra>",
+            )
+        )
+        figure.update_xaxes(title_text="Recorded category", tickangle=-45, automargin=True)
+        figure.update_yaxes(title_text="Patient count")
 
-    axis.set_title(title)
-    figure.tight_layout()
-    figure.savefig(path, dpi=150)
-    plt.close(figure)
+    if message:
+        figure.add_annotation(
+            text=message,
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+            showarrow=False,
+        )
+        figure.update_xaxes(visible=False)
+        figure.update_yaxes(visible=False)
+    figure.update_layout(
+        title=title,
+        template=plotly_template(theme),
+        showlegend=False,
+        height=450,
+        bargap=0.08,
+        margin={"l": 75, "r": 30, "t": 80, "b": 110},
+    )
+    write_plotly_html(figure, path)
     return kind, numeric_values, categories
 
 
@@ -105,6 +134,7 @@ def generate_parameter_distributions(
     *,
     bins: int = 20,
     phase: str = "all",
+    theme: str = "light",
     parameter_selection: Mapping[str, object] | None = None,
 ) -> int:
     """Plot every mapped parameter from the patient-level analysis tables."""
@@ -120,22 +150,24 @@ def generate_parameter_distributions(
         config = select_parameter_map(config, **parameter_selection)
     postoperative_specs = config.get("postoperative_measurements", [])
     preoperative_rows = _read_rows(output / "patient_vectors.csv")
+    duringoperative_rows = _read_rows(output / "duringoperative_measurements.csv")
     postoperative_rows = _read_rows(output / "postoperative_measurements.csv")
     preoperative_columns = set(preoperative_rows[0]) if preoperative_rows else set()
+    duringoperative_columns = set(duringoperative_rows[0]) if duringoperative_rows else set()
     postoperative_columns = set(postoperative_rows[0]) if postoperative_rows else set()
     plots = output / "parameter_distributions"
     plots.mkdir(parents=True, exist_ok=True)
 
     summary_rows: list[dict[str, str | int]] = []
     category_rows: list[dict[str, str | int]] = []
-    phase_names = {"all": None, "preoperative": "Pre-operative", "postoperative": "Post-operative"}
+    phase_names = {"all": None, "preoperative": "Pre-operative", "duringoperative": "During-operative", "postoperative": "Post-operative"}
     try:
         phase_name = phase_names[phase.casefold()]
     except KeyError as error:
-        raise ValueError("phase must be all, preoperative, or postoperative") from error
+        raise ValueError("phase must be all, preoperative, duringoperative, or postoperative") from error
     parameters = [
         parameter for parameter in config.get("parameters", [])
-        if parameter.get("phase") in {"Pre-operative", "Post-operative"}
+        if parameter.get("phase") in {"Pre-operative", "During-operative", "Post-operative"}
         and (phase_name is None or parameter.get("phase") == phase_name)
     ]
     for parameter in parameters:
@@ -145,19 +177,24 @@ def generate_parameter_distributions(
             rows = preoperative_rows
             column = parameter_id if parameter_id in preoperative_columns else ""
             filename_phase = "preoperative"
+        elif parameter_phase == "During-operative":
+            rows = duringoperative_rows
+            column = parameter_id if parameter_id in duringoperative_columns else ""
+            filename_phase = "duringoperative"
         else:
             rows = postoperative_rows
             column = _measurement_column(parameter, postoperative_specs, postoperative_columns)
             filename_phase = "postoperative"
         values = [row.get(column, "") if column else "" for row in rows]
         numeric_expected = parameter.get("parameter_type") in {"numeric", "derived_numeric", "time_series_numeric"}
-        plot_path = plots / f"{filename_phase}_{re.sub(r'[^A-Za-z0-9_-]+', '_', parameter_id)}.png"
+        plot_path = plots / f"{filename_phase}_{re.sub(r'[^A-Za-z0-9_-]+', '_', parameter_id)}.html"
         kind, numeric_values, categories = _plot_distribution(
             plot_path,
             f"{parameter.get('name', parameter_id)} — {parameter_phase}",
             values,
             bins,
             numeric_expected=numeric_expected,
+            theme=theme,
         )
         observed_count = len(numeric_values) if numeric_expected else sum(bool(value.strip()) for value in values)
         summary: dict[str, str | int] = {

@@ -9,12 +9,13 @@ from typing import Iterable
 from src.csv_utils import PatientCsvReader, is_missing, normalise, number, number_component
 
 PREOPERATIVE_PHASE = "Pre-operative"
-EVENT_FIELDS = ("epic.EVENTS.EVENT", "event", "events")
 
 
 @dataclass(frozen=True)
 class PreoperativeResult:
     cutoff: float | None
+    end_cutoff: float | None
+    postoperative_end_cutoff: float | None
     features: dict[str, str]
     feature_status: dict[str, str]
     feature_indexes: dict[str, list[int]]
@@ -72,7 +73,7 @@ class PreoperativeProcessor:
 
     def process(self, paths: str | Path | Iterable[str | Path]) -> PreoperativeResult:
         reader = PatientCsvReader(paths)
-        cutoff = self._find_cutoff(reader)
+        cutoff, end_cutoff, postoperative_end_cutoff = self._find_boundaries(reader)
         feature_indexes = self._feature_indexes(reader)
         best: dict[str, tuple[float, str] | None] = {feature_id: None for feature_id in self.parameters}
         static_values: dict[str, set[str]] = {feature_id: set() for feature_id in self.parameters}
@@ -115,12 +116,21 @@ class PreoperativeProcessor:
         for parameter in self.parameter_specs:
             feature_id = parameter["id"]
             candidate = best[feature_id]
-            if candidate is not None:
-                features[feature_id] = candidate[1]
-                statuses[feature_id] = "present_preoperatively"
-            elif not feature_indexes[feature_id]:
+            if not feature_indexes[feature_id]:
                 features[feature_id] = ""
                 statuses[feature_id] = "column_missing"
+            elif parameter.get("timed") is False and candidate is None:
+                values = static_values[feature_id]
+                features[feature_id] = next(iter(values)) if len(values) == 1 else ""
+                statuses[feature_id] = (
+                    "present_untimed" if len(values) == 1 else
+                    "ambiguous_untimed_value" if values else "no_preoperative_value"
+                )
+            elif candidate is not None:
+                features[feature_id] = candidate[1]
+                statuses[feature_id] = (
+                    "present_untimed" if parameter.get("timed") is False else "present_preoperatively"
+                )
             elif cutoff is None and parameter.get("allow_static_cutoff_fallback", False) and len(static_values[feature_id]) == 1:
                 features[feature_id] = next(iter(static_values[feature_id]))
                 statuses[feature_id] = "present_static_cutoff_unavailable"
@@ -139,6 +149,8 @@ class PreoperativeProcessor:
             baseline_time, baseline = max(preoperative_creatinine, key=lambda item: item[0])
         return PreoperativeResult(
             cutoff=cutoff,
+            end_cutoff=end_cutoff,
+            postoperative_end_cutoff=postoperative_end_cutoff,
             features=features,
             feature_status=statuses,
             feature_indexes=feature_indexes,
@@ -157,22 +169,40 @@ class PreoperativeProcessor:
             result[parameter["id"]] = list(dict.fromkeys(matches))
         return result
 
-    def _find_cutoff(self, reader: PatientCsvReader) -> float | None:
-        event_index = reader.find_index(EVENT_FIELDS)
-        if event_index is None:
-            return None
-        patterns = [
-            normalise(pattern)
-            for pattern in self.parameter_map.get("preoperative_start_event_patterns", [])
-            if normalise(pattern)
-        ]
-        matches = []
+    def _find_boundaries(
+        self, reader: PatientCsvReader,
+    ) -> tuple[float | None, float | None, float | None]:
+        boundaries = self.parameter_map["phase_boundaries"]
+        boundary_names = ["operation_start", "operation_end"]
+        if "postoperative_end" in boundaries:
+            boundary_names.append("postoperative_end")
+        matches: dict[str, list[float]] = {name: [] for name in boundary_names}
+        events = []
+        for name in boundary_names:
+            config = boundaries[name]
+            indexes = list(dict.fromkeys(
+                index for field in config["event_fields"]
+                for index in reader.columns.get(normalise(field), [])
+            ))
+            patterns = [normalise(phrase) for phrase in config["phrases"]]
+            events.append((name, indexes, patterns))
         for row in reader.rows():
-            if event_index >= len(row):
+            timestamp = reader.timestamp(row)
+            if timestamp is None:
                 continue
-            event = normalise(row[event_index])
-            if event and any(pattern in event for pattern in patterns):
-                timestamp = reader.timestamp(row)
-                if timestamp is not None:
-                    matches.append(timestamp)
-        return min(matches) if matches else None
+            for name, indexes, patterns in events:
+                for index in indexes:
+                    if index < len(row) and any(
+                        phrase in normalise(row[index]) for phrase in patterns
+                    ):
+                        matches[name].append(timestamp)
+        starts = matches["operation_start"]
+        ends = matches["operation_end"]
+        start = min(starts) if starts else None
+        end = min((time for time in ends if start is not None and time > start), default=None)
+        post_ends = matches.get("postoperative_end", [])
+        postoperative_end = min(
+            (time for time in post_ends if end is not None and time > end),
+            default=None,
+        )
+        return start, end, postoperative_end

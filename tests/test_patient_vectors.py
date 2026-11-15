@@ -6,12 +6,14 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from src.cli import main
 from src.logger import Logger
 from src.parameter_distributions import _plot_distribution, generate_parameter_distributions
-from src.patient_heatmaps import build_parameter_matrix
+from src.patient_heatmaps import build_parameter_matrix, write_heatmap
 from src.patient_pipeline import analyze_inputs
+from src.plotly_output import write_plotly_html
 from src.outcome_rules import CreatinineStager, OutcomeClassifier
 from src.pipeline import load_parameter_map
 from src.parameter_map import write_parameter_map
@@ -89,6 +91,7 @@ class PatientVectorTests(unittest.TestCase):
         rows = [
             row(0, pre),
             row(3600, {"epic.EVENTS.EVENT": "Start anesthesie"}),
+            row(5400, {"epic.EVENTS.EVENT": "Stop anesthesie"}),
         ]
         rows.append(
             row(
@@ -161,11 +164,11 @@ class PatientVectorTests(unittest.TestCase):
             self.assertEqual(postoperative_measurements[0]["aki_kdigo_stage"], "2")
             self.assertNotIn("patient-a.csv", (root / "results/patient_vectors.csv").read_text(encoding="utf-8"))
             csv_outputs = list((root / "results").glob("*.csv"))
-            self.assertEqual({path.name for path in csv_outputs}, {"patient_vectors.csv", "patient_outcomes.csv", "postoperative_measurements.csv"})
+            self.assertEqual({path.name for path in csv_outputs}, {"patient_vectors.csv", "patient_outcomes.csv", "duringoperative_measurements.csv", "postoperative_measurements.csv", "time_series.csv"})
 
     def test_numeric_distribution_parses_values_before_annotations(self):
         with tempfile.TemporaryDirectory() as temporary:
-            plot = Path(temporary) / "numeric.png"
+            plot = Path(temporary) / "numeric.html"
             kind, values, categories = _plot_distribution(
                 plot,
                 "Synthetic numeric labs",
@@ -177,6 +180,35 @@ class PatientVectorTests(unittest.TestCase):
             self.assertEqual(values, [8.1, 10.2])
             self.assertFalse(categories)
             self.assertTrue(plot.exists())
+
+    def test_dark_theme_applies_to_distribution_and_heatmap_plots(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with patch(
+                "src.parameter_distributions.write_plotly_html",
+                wraps=write_plotly_html,
+            ) as distribution_writer:
+                _plot_distribution(
+                    root / "distribution.html", "Synthetic", ["1", "2"], 4,
+                    numeric_expected=True, theme="dark",
+                )
+            with patch(
+                "src.patient_heatmaps.write_plotly_html",
+                wraps=write_plotly_html,
+            ) as heatmap_writer:
+                write_heatmap(
+                    root / "heatmap.html", [[0.0, 1.0]], ["patient_001"],
+                    ["a", "b"], "Synthetic heatmap", "Value", theme="dark",
+                )
+
+            self.assertEqual(
+                distribution_writer.call_args.args[0].layout.template.layout.paper_bgcolor,
+                "rgb(17,17,17)",
+            )
+            self.assertEqual(
+                heatmap_writer.call_args.args[0].layout.template.layout.paper_bgcolor,
+                "rgb(17,17,17)",
+            )
 
     def test_numeric_lab_fields_keep_value_prefix_and_plot_as_numeric(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -233,13 +265,13 @@ class PatientVectorTests(unittest.TestCase):
             self.assertEqual(outcome["target"], "NA")
             self.assertEqual(outcome["target_status"], "unclassified")
             self.assertNotIn("outcome_score", outcome)
-            self.assertEqual(len(list((root / "results").glob("*.csv"))), 3)
+            self.assertEqual(len(list((root / "results").glob("*.csv"))), 5)
 
-    def test_parameter_catalog_contains_only_pre_and_postoperative_parameters(self):
+    def test_parameter_catalog_contains_all_three_phase_parameters(self):
         catalog = load_parameter_map(PARAMETER_MAP)
         phases = {parameter["phase"] for parameter in catalog["parameters"]}
-        self.assertEqual(phases, {"Pre-operative", "Post-operative"})
-        self.assertEqual(len(catalog["parameters"]), 20)
+        self.assertEqual(phases, {"Pre-operative", "During-operative", "Post-operative"})
+        self.assertEqual(len(catalog["parameters"]), 21)
         required = {
             "clinical_parameter", "role", "priority", "exact_field_names",
             "workbook_exact_field_entry", "workbook_row", "extraction_definition",
@@ -328,9 +360,16 @@ class PatientVectorTests(unittest.TestCase):
                 vectors = list(csv.DictReader(stream))
             self.assertEqual(len(vectors), 3)
             self.assertEqual(vectors[2]["height"], "")
-            self.assertTrue((root / "results/preoperative_missingness_heatmap.png").is_file())
-            self.assertTrue((root / "results/preoperative_heatmap.png").is_file())
-            self.assertTrue((root / "results/postoperative_heatmap.png").is_file())
+            expected_plots = [
+                "preoperative_missingness_heatmap.html",
+                "preoperative_heatmap.html",
+                "postoperative_heatmap.html",
+            ]
+            for name in expected_plots:
+                path = root / "results" / name
+                self.assertTrue(path.is_file())
+                self.assertIn("Plotly.newPlot", path.read_text(encoding="utf-8"))
+            self.assertTrue((root / "results/plotly.min.js").is_file())
             with (root / "results/postoperative_measurements.csv").open(
                 newline="", encoding="utf-8"
             ) as stream:
@@ -354,7 +393,29 @@ class PatientVectorTests(unittest.TestCase):
                 value_key="postoperative_measurements",
             )
             self.assertTrue(all(any(spec["id"] in label for label in heatmap_labels) for spec in measurement_specs))
-            self.assertEqual(len(list((root / "results").glob("*.csv"))), 3)
+            self.assertEqual(len(list((root / "results").glob("*.csv"))), 5)
+
+    def test_patient_missingness_heatmap_uses_configured_plotly_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = self.make_patient(root, "synthetic.csv", missing_height=True)
+            output = root / "results"
+            plot = output / "diagnostics" / "missing_by_patient.html"
+            with redirect_stderr(io.StringIO()), Logger(log_root=root / "logs") as logger:
+                analyze_inputs(
+                    [source], output, PARAMETER_MAP, logger,
+                    generate_plots=False,
+                    generate_patient_missingness=True,
+                    patient_missingness_output=plot,
+                )
+
+            html = plot.read_text(encoding="utf-8")
+            self.assertIn("Plotly.newPlot", html)
+            self.assertIn("patient_001", html)
+            self.assertIn("Patient pseudonym", html)
+            self.assertFalse((output / "preoperative_heatmap.html").exists())
+            self.assertFalse((output / "postoperative_heatmap.html").exists())
+            self.assertFalse((output / "preoperative_missingness_heatmap.html").exists())
 
     def test_death_and_explicit_postoperative_categories_are_failures(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -445,9 +506,9 @@ class PatientVectorTests(unittest.TestCase):
                 ])
             self.assertEqual(result, 0)
             plots = root / "results" / "parameter_distributions"
-            self.assertTrue((plots / "preoperative_age.png").is_file())
-            self.assertTrue((plots / "preoperative_operation_diagnosis_proxy.png").is_file())
-            self.assertTrue((plots / "postoperative_postop_creatinine_72h.png").is_file())
+            self.assertTrue((plots / "preoperative_age.html").is_file())
+            self.assertTrue((plots / "preoperative_operation_diagnosis_proxy.html").is_file())
+            self.assertTrue((plots / "postoperative_postop_creatinine_72h.html").is_file())
             summary = (root / "results" / "parameter_distribution_summary.csv").read_text(encoding="utf-8")
             self.assertIn("operation_diagnosis_proxy,Operation / diagnosis proxy,Pre-operative,categorical,2,2", summary)
             self.assertIn("postop_creatinine_72h,Creatinine first 72 h,Post-operative,numeric,2,2", summary)
@@ -474,12 +535,12 @@ class PatientVectorTests(unittest.TestCase):
             source = root / "patient.csv"
             source.write_text("unknown_column\nvalue\n", encoding="utf-8")
             self.run_analysis([source], root / "results", root / "logs")
-            self.assertTrue((root / "results/preoperative_heatmap.png").is_file())
+            self.assertTrue((root / "results/preoperative_heatmap.html").is_file())
             with (root / "results/patient_vectors.csv").open(newline="", encoding="utf-8") as stream:
                 vectors = list(csv.DictReader(stream))
             self.assertEqual(len(vectors), 1)
             self.assertNotIn("target", vectors[0])
-            self.assertEqual(len(list((root / "results").glob("*.csv"))), 3)
+            self.assertEqual(len(list((root / "results").glob("*.csv"))), 5)
 
     def test_creatinine_staging_uses_configured_xml_thresholds_and_time_windows(self):
         hour = 3600

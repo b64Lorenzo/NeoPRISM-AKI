@@ -22,7 +22,7 @@ If recorded BMI is missing or nonnumeric, the processor uses `BMI = weight_kg / 
 
 ## How values are selected
 
-The pipeline uses the configured surgery-start event as the cutoff. For time-varying parameters it takes the last valid reading strictly before that cutoff. If no cutoff can be found, a static demographic or operation/diagnosis proxy value is retained only when exactly one distinct non-missing value occurs; time-varying laboratory features remain missing.
+The pipeline uses each phase's `end_event` inside XML `<relevantParameters><settings><entry name="included_phases">`: the pre-operative event's `event_fields` and `phrases` find the earliest timestamped operation start as the cutoff; edit these values to match CSV headers and phrases. The during-operative item's `end_event` marks operation end and separates during/postoperative values (see the [XML guide](xml-pipeline-configuration.md#editable-operation-boundaries)). For time-varying parameters it takes the last valid reading strictly before that cutoff. The pre-operative `epic.DEMOGRAPHICS` class has `<timed>false</timed>`: its values are displayed without time in the dashboard, but dated records still obey the cutoff to prevent postoperative leakage. When no dated pre-operative value exists, an untimed value is retained only if the patient family has exactly one distinct non-missing value; conflicting values stay missing. Other time-varying laboratory features remain missing when the cutoff is unavailable.
 
 Numeric features retain the numeric component before the first `|` and discard trailing annotations; nonnumeric text in a numeric field is missing. Categorical fields remain categorical. Missing BMI is derived from weight and height when possible; other values are not imputed. Analysis does not scale vector values. The perceptron fits numeric standardization and categorical one-hot encoding using training rows only. Heatmap-only transformations do not alter `patient_vectors.csv`. During-operation and postoperative measurements are not input features.
 
@@ -32,6 +32,6 @@ Numeric features retain the numeric component before the first `|` and discard t
 - `patient_outcomes.csv`: postoperative-derived target and evidence metadata keyed by patient ID.
 - `training_set.csv` and `validation_set.csv`: produced by the perceptron command; validation has no target column.
 - `perceptron_model.json`: model parameters and aggregate validation metrics, without patient rows or IDs.
-- `preoperative_heatmap.png`: visual overview; it does not modify the CSV values.
+- `preoperative_heatmap.html`: visual overview; it does not modify the CSV values.
 
 Pre-operative definitions are maintained directly in `<relevantParameters><pre>` in `config/pipeline.xml`; shared derivation settings live in `<relevantParameters><settings>`.

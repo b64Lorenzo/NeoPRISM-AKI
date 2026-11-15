@@ -113,9 +113,10 @@ class PostoperativeProcessor:
     ) -> PostoperativeResult:
         reader = PatientCsvReader(paths)
         rules = self.parameter_map.get("patient_outcome_rules", {})
+        post_start = preoperative.end_cutoff
         window_end = None
-        if preoperative.cutoff is not None:
-            window_end = preoperative.cutoff + float(rules["postoperative_window_hours"]) * 3600.0
+        if post_start is not None:
+            window_end = post_start + float(rules["postoperative_window_hours"]) * 3600.0
 
         direct_columns = list(rules.get("direct_outcome_columns", []))
         if self.outcome_column:
@@ -154,9 +155,9 @@ class PostoperativeProcessor:
         for row in reader.rows():
             timestamp = reader.timestamp(row)
             if (
-                preoperative.cutoff is not None
+                post_start is not None
                 and timestamp is not None
-                and preoperative.cutoff <= timestamp <= (window_end or preoperative.cutoff)
+                and post_start <= timestamp <= (window_end or post_start)
                 and creatinine_index is not None
                 and creatinine_index < len(row)
             ):
@@ -164,16 +165,14 @@ class PostoperativeProcessor:
                 if value is not None:
                     postoperative_creatinine.append((timestamp, value))
 
-            postoperative_row = preoperative.cutoff is None or (
-                timestamp is not None and timestamp >= preoperative.cutoff
-            )
+            postoperative_row = post_start is not None and timestamp is not None and timestamp >= post_start
             for name, indexes in class_indexes.items():
                 if any(
                     index < len(row)
-                    and (patient_scope or (preoperative.cutoff is not None and postoperative_row))
+                    and (patient_scope or postoperative_row)
                     and (hours is None or (
-                        preoperative.cutoff is not None and timestamp is not None
-                        and timestamp <= preoperative.cutoff + float(hours) * 3600.0
+                        post_start is not None and timestamp is not None
+                        and timestamp <= post_start + float(hours) * 3600.0
                     ))
                     and bool(row[index].strip())
                     and not is_missing(row[index], self.missing_tokens)
@@ -189,15 +188,13 @@ class PostoperativeProcessor:
 
             for spec in self.measurement_specs:
                 patient_scope = spec.get("record_scope") == "patient"
-                if not patient_scope and (
-                    preoperative.cutoff is None or timestamp is None or timestamp < preoperative.cutoff
-                ):
+                if not patient_scope and not postoperative_row:
                     continue
                 indexes = measurement_indexes.get(spec["id"], [])
                 hours = spec.get("window_hours")
                 if not indexes or (hours is not None and (
-                    preoperative.cutoff is None or timestamp is None
-                    or timestamp > preoperative.cutoff + float(hours) * 3600.0
+                    post_start is None or timestamp is None
+                    or timestamp > post_start + float(hours) * 3600.0
                 )):
                     continue
                 raw_measurements[spec["id"]].extend(

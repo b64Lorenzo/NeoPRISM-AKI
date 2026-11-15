@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
 from src.csv_utils import number_component
+from src.plotly_output import plotly_template, write_plotly_html
 
 HEATMAP_SAMPLE_LIMIT = 500
 
@@ -16,50 +17,88 @@ def _number(value: object) -> float | None:
     return number_component(value)
 
 
-def _pyplot():
+def _plotly_graph_objects():
     try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
+        import plotly.graph_objects as go
     except ImportError as error:
-        raise RuntimeError("Heatmaps require Matplotlib; install dependencies from requirements.txt") from error
-    return plt
+        raise RuntimeError("Heatmaps require Plotly; install dependencies from requirements.txt") from error
+    return go
 
 
-def write_placeholder_heatmap(path: Path, title: str, message: str) -> None:
-    plt = _pyplot()
-    figure, axis = plt.subplots(figsize=(8, 3.5))
-    axis.set_title(title)
-    axis.text(0.5, 0.5, message, ha="center", va="center", transform=axis.transAxes)
-    axis.set_axis_off()
-    figure.tight_layout()
-    figure.savefig(path, dpi=150)
-    plt.close(figure)
+def write_placeholder_heatmap(path: Path, title: str, message: str, *, theme: str = "light") -> None:
+    figure = _plotly_graph_objects().Figure()
+    figure.add_annotation(
+        text=message,
+        x=0.5,
+        y=0.5,
+        xref="paper",
+        yref="paper",
+        showarrow=False,
+    )
+    figure.update_layout(
+        title=title,
+        template=plotly_template(theme),
+        height=350,
+        xaxis={"visible": False},
+        yaxis={"visible": False},
+    )
+    write_plotly_html(figure, path)
 
 
-def write_heatmap(path: Path, matrix: list[list[float]], row_labels: list[str], column_labels: list[str], title: str, colorbar_label: str, row_axis_label: str = "Patient pseudonym") -> None:
+def write_heatmap(
+    path: Path,
+    matrix: list[list[float]],
+    row_labels: list[str],
+    column_labels: list[str],
+    title: str,
+    colorbar_label: str,
+    row_axis_label: str = "Patient pseudonym",
+    *,
+    colorscale="Viridis",
+    colorbar_tickvals: Sequence[float] = (),
+    colorbar_ticktext: Sequence[str] = (),
+    theme: str = "light",
+) -> None:
     if not matrix or not column_labels:
-        write_placeholder_heatmap(path, title, "No mapped measurements available to plot.")
+        write_placeholder_heatmap(path, title, "No mapped measurements available to plot.", theme=theme)
         return
-    plt = _pyplot()
-    width = max(8.0, min(22.0, 0.7 * len(column_labels) + 3.0))
-    height = max(3.5, min(18.0, 0.28 * len(row_labels) + 2.5))
-    figure, axis = plt.subplots(figsize=(width, height))
-    cmap = plt.get_cmap("viridis").copy()
-    cmap.set_bad(color="#b8b8b8")
-    image = axis.imshow(matrix, aspect="auto", interpolation="nearest", cmap=cmap)
-    axis.set_xticks(range(len(column_labels)), labels=column_labels, rotation=60, ha="right")
-    if len(row_labels) <= 80:
-        axis.set_yticks(range(len(row_labels)), labels=row_labels)
-    else:
-        axis.set_yticks([])
-    axis.set_title(title)
-    axis.set_xlabel("Parameter")
-    axis.set_ylabel(row_axis_label)
-    figure.colorbar(image, ax=axis, label=colorbar_label)
-    figure.tight_layout()
-    figure.savefig(path, dpi=150)
-    plt.close(figure)
+
+    colorbar = {"title": {"text": colorbar_label}}
+    if colorbar_tickvals:
+        colorbar["tickvals"] = list(colorbar_tickvals)
+        colorbar["ticktext"] = list(colorbar_ticktext)
+    figure = _plotly_graph_objects().Figure(
+        data=[
+            _plotly_graph_objects().Heatmap(
+                z=matrix,
+                x=column_labels,
+                y=row_labels,
+                zmin=0,
+                zmax=1,
+                colorscale=colorscale,
+                colorbar=colorbar,
+                hoverongaps=False,
+                hovertemplate=(
+                    "Patient/record: %{y}<br>Parameter: %{x}<br>Value: %{z:.3f}<extra></extra>"
+                ),
+            )
+        ]
+    )
+    figure.update_layout(
+        title=title,
+        template=plotly_template(theme),
+        width=max(900, min(1800, 110 * len(column_labels) + 350)),
+        height=max(400, min(1800, 24 * len(row_labels) + 250)),
+        plot_bgcolor="#333333" if theme == "dark" else "#b8b8b8",
+        margin={"l": 120, "r": 50, "t": 90, "b": 140},
+    )
+    figure.update_xaxes(title_text="Parameter", tickangle=-45, automargin=True)
+    figure.update_yaxes(title_text=row_axis_label, autorange="reversed", automargin=True)
+    if len(row_labels) > 80:
+        step = max(1, len(row_labels) // 20)
+        ticks = row_labels[::step]
+        figure.update_yaxes(tickmode="array", tickvals=ticks, ticktext=ticks)
+    write_plotly_html(figure, path)
 
 
 def sample_patients(patients: list[dict], limit: int = HEATMAP_SAMPLE_LIMIT) -> list[dict]:
@@ -100,10 +139,19 @@ def build_parameter_matrix(patients: list[dict], parameters: Sequence[Mapping], 
     return matrix, labels
 
 
-def write_parameter_heatmap(path: Path, patients: list[dict], parameters: Sequence[Mapping], *, value_key: str, title: str, categorical_ids: Iterable[str] = ()) -> None:
+def write_parameter_heatmap(
+    path: Path,
+    patients: list[dict],
+    parameters: Sequence[Mapping],
+    *,
+    value_key: str,
+    title: str,
+    categorical_ids: Iterable[str] = (),
+    theme: str = "light",
+) -> None:
     selected = sample_patients(patients)
     if not selected:
-        write_placeholder_heatmap(path, title, "No patient records available to plot.")
+        write_placeholder_heatmap(path, title, "No patient records available to plot.", theme=theme)
         return
     matrix, labels = build_parameter_matrix(
         selected,
@@ -111,4 +159,12 @@ def write_parameter_heatmap(path: Path, patients: list[dict], parameters: Sequen
         value_key=value_key,
         categorical_ids=categorical_ids,
     )
-    write_heatmap(path, matrix, [patient["patient_id"] for patient in selected], labels, title, "Min-max scaled value / one-hot indicator")
+    write_heatmap(
+        path,
+        matrix,
+        [patient["patient_id"] for patient in selected],
+        labels,
+        title,
+        "Min-max scaled value / one-hot indicator",
+        theme=theme,
+    )

@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 
 from src.parameter_map import load_parameter_map_element
 from src.model_config import parse_active_model
+from src.timeline_dashboard_view import DashboardLayout
 
 PHASES = ("Pre-operative", "During-operative", "Post-operative")
 
@@ -94,10 +95,49 @@ def load_pipeline_config(path: str | Path) -> dict:
     }
     bins = int(_required(plotting, "bins"))
     plot_phase = _required(plotting, "phase")
-    if bins < 1 or plot_phase not in {"all", "preoperative", "postoperative"}:
+    if bins < 1 or plot_phase not in {"all", "preoperative", "duringoperative", "postoperative"}:
         raise ValueError("Preprocessing plotting requires positive bins and a supported phase")
+    missingness_element = plotting.find("missingnessByPatient")
+    if missingness_element is None:
+        raise ValueError("Missing preprocessing/plotting/missingnessByPatient section")
+    missingness_output = _path(project_root, _required(missingness_element, "output"))
+    missingness_by_patient = {
+        "run": _boolean(missingness_element, "run"),
+        "output": missingness_output,
+    }
+    theme = _required(plotting, "theme")
+    if theme not in {"light", "dark"}:
+        raise ValueError("Preprocessing plotting theme must be light or dark")
+    patient_timeline_element = plotting.find("patientTimeline")
+    if patient_timeline_element is None:
+        raise ValueError("Missing preprocessing/plotting/patientTimeline section")
+    patient_timeline = {
+        "run": _boolean(patient_timeline_element, "run"),
+        "patient_ids": _list(patient_timeline_element, "patientIds", "id"),
+        "compare_all_patients": _boolean(patient_timeline_element, "compareAllPatients"),
+        "include_study_plots": _boolean(patient_timeline_element, "includeStudyPlots"),
+        "layout": DashboardLayout.from_xml(patient_timeline_element.find("layout")),
+        "output": _path(project_root, _required(patient_timeline_element, "output")),
+    }
+    time_series_element = plotting.find("timeSeries")
+    if time_series_element is None:
+        raise ValueError("Missing preprocessing/plotting/timeSeries section")
+    group_by = _required(time_series_element, "groupBy")
+    if group_by not in {"parameter", "class"}:
+        raise ValueError("Time-series groupBy must be parameter or class")
+    time_series_plotting = {
+        "run": _boolean(time_series_element, "run"),
+        "group_by": group_by,
+        "parameter_ids": _list(time_series_element, "parameterIds", "id"),
+        "class_names": _list(time_series_element, "classNames", "name"),
+        "patient_ids": _list(time_series_element, "patientIds", "id"),
+        "output_directory": _path(project_root, _required(time_series_element, "outputDirectory")),
+    }
+    preprocessing_run = _boolean(preprocessing, "run")
+    if time_series_plotting["run"] and preprocessing_run and not parameter_map.get("export_time_series", False):
+        raise ValueError("Time-series plotting with preprocessing requires export_time_series=true")
     preprocessing_config = {
-        "run": _boolean(preprocessing, "run"),
+        "run": preprocessing_run,
         "inputs": input_paths,
         "output_directory": _path(project_root, _required(preprocessing, "outputDirectory")),
         "parameter_map": parameter_map,
@@ -116,6 +156,10 @@ def load_pipeline_config(path: str | Path) -> dict:
             "distributions": _boolean(plotting, "distributions"),
             "phase": plot_phase,
             "bins": bins,
+            "theme": theme,
+            "missingness_by_patient": missingness_by_patient,
+            "time_series": time_series_plotting,
+            "patient_timeline": patient_timeline,
         },
     }
 

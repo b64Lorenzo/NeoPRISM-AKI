@@ -23,7 +23,7 @@ class OutcomeClassifierTests(unittest.TestCase):
     def test_catalog_has_per_parameter_criteria_and_no_rewards(self):
         p=Path(__file__).resolve().parents[1]/"config"/"pipeline.xml"
         d=load_parameter_map(p); ps=[x for x in d["parameters"] if x["phase"]=="Post-operative"]
-        self.assertEqual(len(d["parameters"]),20); self.assertEqual({x["phase"] for x in d["parameters"]},{"Pre-operative","Post-operative"})
+        self.assertEqual(len(d["parameters"]),21); self.assertEqual({x["phase"] for x in d["parameters"]},{"Pre-operative","During-operative","Post-operative"})
         self.assertEqual(len(ps),11); self.assertTrue(all({"success","failure"}<=x["outcome_criteria"].keys() for x in ps))
         self.assertFalse(any("reward" in x for x in d["parameters"])); self.assertNotIn("outcome_scoring",d); self.assertNotIn("severity_bands",d)
         self.assertEqual(sum(x["outcome_criteria"]["success"] is not None for x in ps),2)

@@ -60,11 +60,11 @@ class PatientFileGroupingTests(unittest.TestCase):
             write("ref_0002.csv", ["unixtime", "epic.EVENTS.EVENT", "epic.DEMOGRAPHICS.age"], [
                 [100, "", 10], [200, "Start surgery", ""],
             ])
-            write("ref_0002_1.csv", ["epic.DEMOGRAPHICS.age", "unixtime", "epic.DEMOGRAPHICS.days mortality", "operation result"], [
-                [15, 150, "", ""], ["", 300, 0, "optimal condition"],
+            write("ref_0002_1.csv", ["epic.DEMOGRAPHICS.age", "unixtime", "epic.DEMOGRAPHICS.days mortality", "operation result", "epic.EVENTS.EVENT"], [
+                [15, 150, "", "", ""], ["", 250, "", "", "Stop anesthesie"], ["", 300, 0, "optimal condition", ""],
             ])
             write("ref_0003.csv", ["unixtime", "epic.EVENTS.EVENT", "epic.DEMOGRAPHICS.age", "operation result"], [
-                [100, "", 12, ""], [200, "Start surgery", "", ""], [300, "", "", "optimal condition"],
+                [100, "", 12, ""], [200, "Start surgery", "", ""], [250, "Stop anesthesie", "", ""], [300, "", "", "optimal condition"],
             ])
             with redirect_stderr(io.StringIO()), Logger(log_root=root / "logs") as logger:
                 patients = analyze_inputs([inputs], root / "results", ROOT / "config/pipeline.xml", logger, generate_plots=False)

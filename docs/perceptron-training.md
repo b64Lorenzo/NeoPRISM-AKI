@@ -62,6 +62,8 @@ The command writes `training_set.csv` (features plus the true `target`), `valida
 - `confusion`: counts for actual failure/success versus predicted failure/success.
 - Training settings, encoding, weights, convergence, and excluded-row count.
 
+When enabled in XML, the aggregate confusion matrix is also saved as interactive Plotly HTML (`results/perceptron_confusion_matrix.html` by default); the plot contains counts only, not patient rows or IDs.
+
 Omitted feature IDs are read from the model's XML `trainingValidation/omit` list; the default `config/pipeline.xml` includes `operation_diagnosis_proxy` there. The CLI `--omit` option adds further comma-separated pre-operative parameter IDs. Use `--training-set`, `--validation-set`, and `--model` to change output paths. At least three eligible rows are required; the split must leave two training rows and one validation row, and training must contain both classes. Missing BMI is derived from weight and height when both are available, using the units configured in `config/pipeline.xml` (defaults kg/cm; supported weight units kg/g/lb and height units m/cm/in—verify source units before research use). Rows still missing another selected feature are excluded.
 
 A single random holdout is a noisy estimate, especially for a small dataset. The perceptron is a hard linear classifier, not a calibrated probability estimator. Outcome criteria are project rules, not clinically validated endpoints; eight postoperative parameter thresholds remain pending clinical definition.

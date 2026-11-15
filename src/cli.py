@@ -14,6 +14,8 @@ from src.patient_pipeline import analyze_inputs
 from src.perceptron import train_model
 from src.pipeline_runner import run_pipeline
 from src.pipeline_config import load_pipeline_config
+from src.parameter_map import load_parameter_map
+from src.time_series_plots import TimeSeriesPlotter
 from src.training_io import (
     join_patient_vectors as _join_patient_vectors,
     read_csv_rows as _read_csv_rows,
@@ -54,15 +56,29 @@ def build_parser() -> argparse.ArgumentParser:
 
     distributions = commands.add_parser(
         "distributions",
-        help="plot the value distribution of every mapped pre- or post-operative parameter",
+        help="plot the value distribution of every mapped pre-, during-, or post-operative parameter",
     )
     distributions.add_argument("inputs", nargs="+", type=Path, help="CSV file(s) or directories to search recursively")
     distributions.add_argument("--output", type=Path, default=Path("results"), help="artifact directory (default: results)")
     distributions.add_argument("--parameter-map", type=Path, default=DEFAULT_PARAMETER_MAP, help="pipeline XML configuration containing relevant parameters")
-    distributions.add_argument("--phase", choices=("all", "preoperative", "postoperative"), default="all", help="which parameter phase to plot")
+    distributions.add_argument("--phase", choices=("all", "preoperative", "duringoperative", "postoperative"), default="all", help="which parameter phase to plot")
     distributions.add_argument("--bins", type=_positive_int, default=20, help="numeric histogram bins (default: 20)")
     distributions.add_argument("--log-dir", type=Path, default=Path("logs"), help="logger output directory (default: logs)")
     distributions.add_argument("--verbose", action="store_true", help="include debug-level events")
+
+    time_series = commands.add_parser(
+        "plot-time-series",
+        help="plot configured time-series readings for one or more patients",
+    )
+    time_series.add_argument("--input", type=Path, default=Path("results/time_series.csv"), help="preprocessed time_series.csv")
+    time_series.add_argument("--output", type=Path, default=Path("results/time_series_plots"), help="plot directory")
+    time_series.add_argument("--parameter-map", type=Path, default=DEFAULT_PARAMETER_MAP, help="XML containing the configured time-series parameters and classes")
+    time_series.add_argument("--group-by", choices=("parameter", "class"), default="parameter", help="make one chart per parameter or class")
+    time_series.add_argument("--parameter", dest="parameters", action="append", type=_values, default=[], help="parameter ID(s), comma-separated; repeat to add more (default: all)")
+    time_series.add_argument("--class", dest="classes", action="append", type=_values, default=[], help="class name(s), comma-separated; repeat to add more")
+    time_series.add_argument("--patient", dest="patients", action="append", type=_values, default=[], help="pseudonymous patient ID(s), comma-separated; default: all")
+    time_series.add_argument("--log-dir", type=Path, default=Path("logs"), help="logger output directory (default: logs)")
+    time_series.add_argument("--verbose", action="store_true", help="include debug-level events")
 
     train = commands.add_parser("train-perceptron", help="train and validate a binary perceptron")
     train.add_argument("--input", type=Path, default=Path("results/patient_vectors.csv"), help="pre-operative feature-only vectors CSV")
@@ -121,6 +137,26 @@ def main(argv: list[str] | None = None) -> int:
                     phase=args.phase,
                 )
                 message = f"Distribution plots complete: {parameter_count} parameter(s). Artifacts: {args.output / 'parameter_distributions'}"
+            elif args.command == "plot-time-series":
+                result = TimeSeriesPlotter(load_parameter_map(args.parameter_map)).generate(
+                    args.input,
+                    args.output,
+                    parameter_ids=[item for group in args.parameters for item in group],
+                    class_names=[item for group in args.classes for item in group],
+                    patient_ids=[item for group in args.patients for item in group],
+                    group_by=args.group_by,
+                )
+                logger.write(
+                    LogLevel.INFO,
+                    "time-series plots",
+                    f"plots={result['plot_count']}; parameters={result['parameter_count']}; "
+                    f"patients={result['patient_count']}; observations={result['observation_count']}",
+                )
+                message = (
+                    f"Time-series plots complete: {result['plot_count']} plot(s), "
+                    f"{result['parameter_count']} parameter(s), {result['patient_count']} patient(s). "
+                    f"Artifacts: {args.output}"
+                )
             else:
                 _, vector_rows = _read_csv_rows(args.input)
                 _, outcome_rows = _read_csv_rows(args.outcomes)
@@ -172,7 +208,7 @@ def main(argv: list[str] | None = None) -> int:
                 logger.write(LogLevel.ERROR, "cli", f"command failed ({type(error).__name__})")
         except OSError:
             pass
-        detail = str(error) if isinstance(error, ValueError) else "check inputs, mapping, and dependencies"
+        detail = str(error) if isinstance(error, (ValueError, RuntimeError)) else "check inputs, mapping, and dependencies"
         print(f"Command failed ({type(error).__name__}): {detail}", file=sys.stderr)
         return 2
 

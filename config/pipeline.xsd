@@ -45,7 +45,26 @@
     <xs:restriction base="xs:string">
       <xs:enumeration value="all" />
       <xs:enumeration value="preoperative" />
+      <xs:enumeration value="duringoperative" />
       <xs:enumeration value="postoperative" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PlotTheme">
+    <xs:annotation>
+      <xs:documentation>Interactive Plotly color scheme used by preprocessing study plots.</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="light" />
+      <xs:enumeration value="dark" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TimeSeriesGroupBy">
+    <xs:annotation>
+      <xs:documentation>Grouping used to create time-series plot files.</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="parameter" />
+      <xs:enumeration value="class" />
     </xs:restriction>
   </xs:simpleType>
   <xs:element name="pipelineConfiguration">
@@ -143,7 +162,7 @@
       </xs:element>
       <xs:element name="plotting" type="PreprocessingPlotType">
         <xs:annotation>
-          <xs:documentation>Settings for preprocessing heatmaps and distributions.</xs:documentation>
+          <xs:documentation>Settings for preprocessing heatmaps, distributions, and time-series plots.</xs:documentation>
         </xs:annotation>
       </xs:element>
     </xs:sequence>
@@ -201,12 +220,107 @@
   </xs:complexType>
   <xs:complexType name="IdListType">
     <xs:annotation>
-      <xs:documentation>Zero or more parameter IDs, used for include, exclude, and model omission lists.</xs:documentation>
+      <xs:documentation>Zero or more parameter IDs, used for include, exclude, model omission, and time-series selection lists.</xs:documentation>
     </xs:annotation>
     <xs:sequence>
       <xs:element name="id" type="xs:string" minOccurs="0" maxOccurs="unbounded">
         <xs:annotation>
-          <xs:documentation>Stable parameter ID used by the surrounding list setting.</xs:documentation>
+          <xs:documentation>Stable parameter ID or pseudonymous patient ID used by the surrounding list setting.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ClassNameListType">
+    <xs:annotation>
+      <xs:documentation>Zero or more XML class names used to filter time-series parameters.</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="name" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Exact class name from the parameter's XML class group.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TimeSeriesPlotType">
+    <xs:annotation>
+      <xs:documentation>Runs phase-relative Plotly HTML plotting from the generated time_series.csv or an existing file in the configured output directory.</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="run" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>Whether the time-series plotter runs; this switch is independent of the heatmap/distribution run switch.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="groupBy" type="TimeSeriesGroupBy">
+        <xs:annotation>
+          <xs:documentation>parameter creates one interactive HTML chart per parameter; class creates one multi-panel HTML chart per class.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="parameterIds" type="IdListType">
+        <xs:annotation>
+          <xs:documentation>Optional time-series parameter IDs; an empty list selects all configured time-series parameters.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="classNames" type="ClassNameListType">
+        <xs:annotation>
+          <xs:documentation>Optional exact XML class names; an empty list does not restrict classes.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="patientIds" type="IdListType">
+        <xs:annotation>
+          <xs:documentation>Optional pseudonymous patient IDs from time_series.csv; an empty list selects all patients.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="outputDirectory" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Output directory for interactive HTML charts and a shared local Plotly.js bundle, relative to the project root unless absolute.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DashboardLayoutType">
+    <xs:annotation><xs:documentation>Reusable bounded dimensions for compact charts and scrollable detail panels.</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="chartHeight" type="xs:positiveInteger">
+        <xs:annotation><xs:documentation>Fixed chart height in pixels (runtime range 320-900).</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="panelMaxHeight" type="xs:positiveInteger">
+        <xs:annotation><xs:documentation>Maximum scrollable table height in pixels (runtime range 120-900).</xs:documentation></xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PatientTimelineType">
+    <xs:annotation>
+      <xs:documentation>Configures a patient-selectable Plotly dashboard with operation-window numeric series from the during.availableClasses inventory, a selectable series dropdown, a phase-grouped event-and-boundary timeline, pre/post tables, and patient-level summaries.</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="run" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>Whether to generate the patient timeline dashboard; independent of preprocessing heatmap and time-series plot switches.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="patientIds" type="IdListType">
+        <xs:annotation>
+          <xs:documentation>Optional generated pseudonymous patient IDs to include; empty means all discovered patient families.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="compareAllPatients" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>Adds an all-patient comparison view to the dashboard selector.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="includeStudyPlots" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>Embeds other preprocessing Plotly HTML artifacts in the dashboard when they were generated.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="layout" type="DashboardLayoutType">
+        <xs:annotation><xs:documentation>Fixed chart height and scrollable detail-panel height.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="output" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Destination .html path for the offline interactive patient timeline dashboard.</xs:documentation>
         </xs:annotation>
       </xs:element>
     </xs:sequence>
@@ -250,29 +364,66 @@
       </xs:element>
     </xs:sequence>
   </xs:complexType>
-  <xs:complexType name="PreprocessingPlotType">
+  <xs:complexType name="PatientMissingnessPlotType">
     <xs:annotation>
-      <xs:documentation>Controls preprocessing heatmaps and parameter-distribution plots.</xs:documentation>
+      <xs:documentation>Controls the Plotly heatmap showing missing pre-operative features by pseudonymous patient.</xs:documentation>
     </xs:annotation>
     <xs:sequence>
       <xs:element name="run" type="xs:boolean">
         <xs:annotation>
-          <xs:documentation>Whether preprocessing plots are generated.</xs:documentation>
+          <xs:documentation>Whether the patient-by-feature missingness heatmap is generated when preprocessing plots are enabled.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="output" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Destination .html path for the interactive patient missingness heatmap.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PreprocessingPlotType">
+    <xs:annotation>
+      <xs:documentation>Controls preprocessing value heatmaps, patient missingness heatmap, parameter distributions, and optional time-series plots.</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="run" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>Whether preprocessing heatmaps are generated.</xs:documentation>
         </xs:annotation>
       </xs:element>
       <xs:element name="distributions" type="xs:boolean">
         <xs:annotation>
-          <xs:documentation>Whether distributions are generated in addition to heatmaps.</xs:documentation>
+          <xs:documentation>Whether parameter distributions are generated in addition to enabled heatmaps.</xs:documentation>
         </xs:annotation>
       </xs:element>
       <xs:element name="phase" type="PlotPhase">
         <xs:annotation>
-          <xs:documentation>Distribution phase filter: all, preoperative, or postoperative.</xs:documentation>
+          <xs:documentation>Distribution phase filter: all, preoperative, duringoperative, or postoperative.</xs:documentation>
         </xs:annotation>
       </xs:element>
       <xs:element name="bins" type="xs:positiveInteger">
         <xs:annotation>
           <xs:documentation>Positive number of histogram bins for numeric distributions.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="theme" type="PlotTheme">
+        <xs:annotation>
+          <xs:documentation>Light or dark Plotly theme applied to preprocessing heatmaps, distributions, time series, and the study dashboard.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="missingnessByPatient" type="PatientMissingnessPlotType">
+        <xs:annotation>
+          <xs:documentation>Configures the default interactive heatmap of missing pre-operative data by patient.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="timeSeries" type="TimeSeriesPlotType">
+        <xs:annotation>
+          <xs:documentation>Optional XML-controlled time-series plotting stage that consumes the generated or existing time_series.csv.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="patientTimeline" type="PatientTimelineType">
+        <xs:annotation>
+          <xs:documentation>Optional offline patient timeline dashboard across pre-operative, during-operative, and post-operative phases.</xs:documentation>
         </xs:annotation>
       </xs:element>
     </xs:sequence>
@@ -407,12 +558,12 @@
     <xs:sequence>
       <xs:element name="run" type="xs:boolean">
         <xs:annotation>
-          <xs:documentation>Whether the validation confusion-matrix image is generated.</xs:documentation>
+          <xs:documentation>Whether the interactive validation confusion-matrix HTML plot is generated.</xs:documentation>
         </xs:annotation>
       </xs:element>
       <xs:element name="output" type="xs:string">
         <xs:annotation>
-          <xs:documentation>Destination image path for the validation confusion matrix.</xs:documentation>
+          <xs:documentation>Destination .html path for the interactive validation confusion matrix.</xs:documentation>
         </xs:annotation>
       </xs:element>
     </xs:sequence>
@@ -421,13 +572,13 @@
     <xs:annotation><xs:documentation>Shared settings and parameter definitions stored once in pre, during, or post.</xs:documentation></xs:annotation>
     <xs:sequence>
       <xs:element name="settings" type="ParameterObjectType">
-        <xs:annotation><xs:documentation>Shared typed settings; parameter definitions belong in phase sections.</xs:documentation></xs:annotation>
+        <xs:annotation><xs:documentation>Shared typed settings. included_phases contains three ordered item/object values, each with phase and end_event. Pre-operative end_event defines operation start; During-operative end_event defines operation end; optional Post-operative end_event defines the end of the post-operative section. An end_event object contains event_fields (CSV headers) and phrases (event text). boolean export_time_series optionally writes a phase-relative CSV (disabled by default). Phase-owned parameter definitions belong below.</xs:documentation></xs:annotation>
       </xs:element>
       <xs:element name="pre" type="RelevantPhaseType">
         <xs:annotation><xs:documentation>Pre-operative parameter definitions and Epic-class groups.</xs:documentation></xs:annotation>
       </xs:element>
-      <xs:element name="during" type="RelevantPhaseType">
-        <xs:annotation><xs:documentation>During-operative definitions for reporting; extraction needs an operation end.</xs:documentation></xs:annotation>
+      <xs:element name="during" type="DuringRelevantPhaseType">
+        <xs:annotation><xs:documentation>During-operative definitions and available Epic class names for operation-only numeric timeline plots; these raw values are visualization-only unless explicitly mapped.</xs:documentation></xs:annotation>
       </xs:element>
       <xs:element name="post" type="PostRelevantPhaseType">
         <xs:annotation><xs:documentation>Post-operative definitions with individual measurements, outcomes and optional class failure.</xs:documentation></xs:annotation>
@@ -437,7 +588,40 @@
       <xs:annotation><xs:documentation>Typed catalog format version.</xs:documentation></xs:annotation>
     </xs:attribute>
   </xs:complexType>
+  <xs:complexType name="EpicClassNameListType">
+    <xs:annotation>
+      <xs:documentation>Explicit Epic class inventory whose numeric source fields are available to the operation timeline visualization.</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="className" type="xs:string" minOccurs="1" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Exact Epic class prefix, such as epic.LAB.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DuringRelevantPhaseType">
+    <xs:annotation>
+      <xs:documentation>During-operative definitions plus the class inventory for raw, visualization-only time-series plotting.</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="availableClasses" type="EpicClassNameListType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Optional explicit inventory of source Epic classes for numeric operation-window plotting; this does not promote fields into model inputs.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="parameter" type="DefinedParameterType">
+          <xs:annotation><xs:documentation>One explicitly mapped during-operative parameter.</xs:documentation></xs:annotation>
+        </xs:element>
+        <xs:element name="class" type="DefinedClassType">
+          <xs:annotation><xs:documentation>Group of explicitly mapped during-operative parameters belonging to one Epic class.</xs:documentation></xs:annotation>
+        </xs:element>
+      </xs:choice>
+    </xs:sequence>
+  </xs:complexType>
   <xs:complexType name="RelevantPhaseType">
+
     <xs:annotation><xs:documentation>Definitions for a phase; class groups contain only explicitly defined matching fields.</xs:documentation></xs:annotation>
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:element name="parameter" type="DefinedParameterType">
@@ -475,6 +659,9 @@
   <xs:complexType name="DefinedClassType">
     <xs:annotation><xs:documentation>Epic class grouping of already defined fields; unrelated CSV headers are not selected.</xs:documentation></xs:annotation>
     <xs:sequence>
+      <xs:element name="timed" type="xs:boolean" minOccurs="0">
+        <xs:annotation><xs:documentation>When false, pre-operative class values are untimed metadata: show below the chart, never assign an operation-relative time.</xs:documentation></xs:annotation>
+      </xs:element>
       <xs:element name="parameter" type="DefinedParameterType" minOccurs="1" maxOccurs="unbounded">
         <xs:annotation><xs:documentation>Parameter defined once inside this Epic class and phase.</xs:documentation></xs:annotation>
       </xs:element>

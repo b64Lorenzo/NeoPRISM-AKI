@@ -19,6 +19,7 @@ from src.csv_utils import (
     is_missing as _is_missing,
     normalise as _normalise,
 )
+from src.plotly_output import plotly_template, write_plotly_html
 
 
 PHASES = ("Pre-operative", "Post-operative")
@@ -152,45 +153,60 @@ def _match_columns(headers: list[str], parameters: list[dict]) -> tuple[list[dic
     return selected, manifest
 
 
-def _write_heatmap(path: Path, source_id: str, columns: list[dict], sample: list[tuple[int, list[bool]]], total_rows: int) -> None:
+def _write_heatmap(
+    path: Path, source_id: str, columns: list[dict], sample: list[tuple[int, list[bool]]],
+    total_rows: int, theme: str = "light",
+) -> None:
     if not columns or not sample:
         return
     try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from matplotlib.colors import ListedColormap
+        import plotly.graph_objects as go
     except ImportError as error:
-        raise RuntimeError("Heatmap plotting requires Matplotlib; install it with: py -3 -m pip install -r requirements.txt") from error
+        raise RuntimeError("Heatmap plotting requires Plotly; install dependencies from requirements.txt") from error
 
     matrix = [[1 if is_missing else 0 for is_missing in mask] for _, mask in sample]
-    figure_width = max(8, min(18, 0.75 * len(columns) + 4))
-    figure_height = max(4, min(12, 0.018 * len(sample) + 3))
-    figure, axis = plt.subplots(figsize=(figure_width, figure_height))
-    image = axis.imshow(
-        matrix,
-        aspect="auto",
-        interpolation="nearest",
-        cmap=ListedColormap(["#2f855a", "#c53030"]),
-        vmin=0,
-        vmax=1,
+    figure = go.Figure(
+        data=[
+            go.Heatmap(
+                z=matrix,
+                x=[item["parameter"] for item in columns],
+                y=[str(record_number) for record_number, _ in sample],
+                zmin=0,
+                zmax=1,
+                colorscale=[[0, "#2f855a"], [1, "#c53030"]],
+                colorbar={
+                    "title": {"text": "Missingness"},
+                    "tickvals": [0, 1],
+                    "ticktext": ["Observed", "Missing"],
+                },
+                hovertemplate=(
+                    "Source record: %{y}<br>Parameter: %{x}<br>Missing: %{z}<extra></extra>"
+                ),
+            )
+        ]
     )
-    axis.set_xticks(range(len(columns)))
-    axis.set_xticklabels([item["parameter"] for item in columns], rotation=45, ha="right")
-    y_step = max(1, len(sample) // 20)
-    ticks = list(range(0, len(sample), y_step))
-    axis.set_yticks(ticks)
-    axis.set_yticklabels([str(sample[index][0]) for index in ticks])
-    axis.set_xlabel("Matched pre-operative parameter")
-    axis.set_ylabel("Source record number (sampled rows shown if >500)")
-    note = f"{total_rows:,} records; heatmap shows {len(sample):,} deterministic sample rows"
-    axis.set_title(f"Pre-operative missingness — {source_id}\n{note}")
-    colorbar = figure.colorbar(image, ax=axis, ticks=[0, 1], fraction=0.04, pad=0.03)
-    colorbar.ax.set_yticklabels(["Observed", "Missing"])
-    figure.tight_layout()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    figure.savefig(path, dpi=150)
-    plt.close(figure)
+    figure.update_layout(
+        title=(
+            f"Pre-operative missingness — {source_id}"
+            f"<br><sup>{total_rows:,} records; heatmap shows "
+            f"{len(sample):,} deterministic sample rows</sup>"
+        ),
+        template=plotly_template(theme),
+        width=max(900, min(1800, 110 * len(columns) + 350)),
+        height=max(400, min(1600, 24 * len(sample) + 250)),
+        margin={"l": 100, "r": 45, "t": 110, "b": 140},
+    )
+    figure.update_xaxes(
+        title_text="Matched pre-operative parameter",
+        tickangle=-45,
+        automargin=True,
+    )
+    figure.update_yaxes(
+        title_text="Source record number (sampled rows shown if >500)",
+        autorange="reversed",
+        automargin=True,
+    )
+    write_plotly_html(figure, path)
 
 
 def _phi(n11: int, n10: int, n01: int, n00: int) -> str:
@@ -209,6 +225,7 @@ def analyze_inputs(
     outcome_column: str | None = None,
     success_values: Iterable[str] | None = None,
     failure_values: Iterable[str] | None = None,
+    theme: str = "light",
 ) -> list[dict]:
     """Extract the two in-scope phases and write a descriptive missingness study."""
     mapping = load_parameter_map(parameter_map_path)
@@ -449,7 +466,10 @@ def analyze_inputs(
 
                 if pre_columns:
                     heatmap_sample.sort(key=lambda item: item[0])
-                    _write_heatmap(output / "missingness_heatmaps" / f"{key}.png", source_id, pre_columns, heatmap_sample, record_count)
+                    _write_heatmap(
+                        output / "missingness_heatmaps" / f"{key}.html",
+                        source_id, pre_columns, heatmap_sample, record_count, theme=theme,
+                    )
                 overall = 100.0 * missing_cells / (record_count * len(pre_columns)) if record_count and pre_columns else 0.0
                 reports.append({
                     "source_id": source_id,
@@ -462,7 +482,7 @@ def analyze_inputs(
                     "postoperative_fields": len(post_columns),
                     "outcome_column": outcome_column or "",
                     "outcome_labels": dict(outcome_counts),
-                    "heatmap": f"missingness_heatmaps/{key}.png" if pre_columns else "",
+                    "heatmap": f"missingness_heatmaps/{key}.html" if pre_columns else "",
                 })
                 logger.write(
                     LogLevel.INFO,

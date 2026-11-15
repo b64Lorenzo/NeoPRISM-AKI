@@ -3,8 +3,10 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from src.perceptron import train_model
+from src.perceptron import plot_confusion_matrix, train_model
+from src.plotly_output import write_plotly_html
 
 ROOT = Path(__file__).resolve().parents[1]
 PARAMETER_MAP = ROOT / "config" / "pipeline.xml"
@@ -20,6 +22,24 @@ class PerceptronTests(unittest.TestCase):
             {"measurement": str(value), "group": "A" if value < 5 else "B", "target": "-1" if value < 5 else "1"}
             for value in range(10)
         ]
+
+    def test_confusion_matrix_supports_configured_dark_theme(self):
+        model = {"confusion": {
+            "failure_predicted_failure": 1,
+            "failure_predicted_success": 0,
+            "success_predicted_failure": 0,
+            "success_predicted_success": 1,
+        }}
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch(
+                "src.perceptron.write_plotly_html",
+                wraps=write_plotly_html,
+            ) as write_plot:
+                plot_confusion_matrix(model, Path(temporary) / "confusion.html", theme="dark")
+        self.assertEqual(
+            write_plot.call_args.args[0].layout.template.layout.paper_bgcolor,
+            "rgb(17,17,17)",
+        )
 
     def test_training_uses_repeatable_random_holdout_and_reports_generalization_error(self):
         first = train_model(self.rows, self.parameters, train_fraction=0.7, epochs=20, seed=41)

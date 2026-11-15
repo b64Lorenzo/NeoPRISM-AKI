@@ -10,6 +10,7 @@ from src.cli import main
 from src.pipeline_config import load_pipeline_config, select_parameter_map
 from src.model_config import NovelDataConfig, PerceptronModelConfig, PlotConfig, TrainingValidationConfig
 from src.perceptron import predict_model, train_model
+from src.timeline_dashboard_view import DashboardLayout
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -47,12 +48,68 @@ class PipelineConfigurationTests(unittest.TestCase):
         )
         self.assertEqual(config["logging"]["level"], "INFO")
         parameters = config["preprocessing"]["parameter_map"]["parameters"]
-        self.assertEqual(len(parameters), 20)
+        self.assertEqual(len(parameters), 21)
         self.assertEqual(sum(item["phase"] == "Pre-operative" for item in parameters), 9)
+        self.assertEqual(sum(item["phase"] == "During-operative" for item in parameters), 1)
         self.assertEqual(sum(item["phase"] == "Post-operative" for item in parameters), 11)
         self.assertEqual(config["preprocessing"]["parameter_map"]["included_phases"], [
             "Pre-operative", "During-operative", "Post-operative"
         ])
+
+    def test_active_xml_configures_patient_timeline_dashboard_by_default(self):
+        config = load_pipeline_config(ROOT / "config" / "pipeline.xml")
+        dashboard = config["preprocessing"]["plotting"].get("patient_timeline")
+
+        self.assertIsNotNone(dashboard)
+        self.assertTrue(dashboard["run"])
+        self.assertEqual(dashboard["patient_ids"], [])
+        self.assertFalse(dashboard["compare_all_patients"])
+        self.assertTrue(dashboard["include_study_plots"])
+        self.assertEqual(config["preprocessing"]["plotting"]["theme"], "dark")
+        self.assertEqual(
+            dashboard["output"],
+            ROOT / "results" / "patient_timeline_dashboard.html",
+        )
+
+    def test_patient_timeline_layout_is_typed_and_configurable_in_both_xml_files(self):
+        for name in ("pipeline.xml", "pipeline.template.xml"):
+            with self.subTest(name=name):
+                root = ET.parse(ROOT / "config" / name).getroot()
+                layout = root.find("preprocessing/plotting/patientTimeline/layout")
+                self.assertIsNotNone(layout)
+                loaded = load_pipeline_config(ROOT / "config" / name)["preprocessing"]["plotting"]["patient_timeline"]["layout"]
+                self.assertIsInstance(loaded, DashboardLayout)
+                self.assertEqual((loaded.chart_height, loaded.panel_max_height), (740, 320))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = ET.parse(ROOT / "config/pipeline.template.xml").getroot()
+            layout = root.find("preprocessing/plotting/patientTimeline/layout")
+            layout.find("chartHeight").text = "640"
+            layout.find("panelMaxHeight").text = "240"
+            path = Path(temporary) / "config" / "pipeline.xml"
+            path.parent.mkdir()
+            ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
+            loaded = load_pipeline_config(path)["preprocessing"]["plotting"]["patient_timeline"]["layout"]
+            self.assertEqual((loaded.chart_height, loaded.panel_max_height), (640, 240))
+            layout.find("chartHeight").text = "0"
+            ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
+            with self.assertRaisesRegex(ValueError, "chartHeight"):
+                load_pipeline_config(path)
+
+    def test_patient_timeline_patient_ids_are_loaded_from_xml(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = ET.parse(ROOT / "config" / "pipeline.template.xml").getroot()
+            timeline = root.find("preprocessing/plotting/patientTimeline")
+            ET.SubElement(timeline.find("patientIds"), "id").text = "patient_002"
+            path = Path(temporary) / "config" / "pipeline.xml"
+            path.parent.mkdir()
+            ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
+
+            config = load_pipeline_config(path)
+
+        self.assertEqual(
+            config["preprocessing"]["plotting"]["patient_timeline"]["patient_ids"],
+            ["patient_002"],
+        )
 
     def test_template_disables_all_execution_switches(self):
         config = load_pipeline_config(ROOT / "config" / "pipeline.template.xml")
@@ -60,7 +117,65 @@ class PipelineConfigurationTests(unittest.TestCase):
         self.assertFalse(config["preprocessing"]["parameter_descriptions"]["run"])
         self.assertFalse(config["preprocessing"]["csv_header_descriptions"]["run"])
         self.assertFalse(config["preprocessing"]["plotting"]["run"])
+        self.assertFalse(config["preprocessing"]["plotting"]["time_series"]["run"])
+        self.assertFalse(config["preprocessing"]["plotting"]["missingness_by_patient"]["run"])
+        self.assertFalse(config["preprocessing"]["plotting"]["patient_timeline"]["run"])
         self.assertFalse(config["model"]["models"]["perceptron"]["run"])
+
+    def test_active_xml_configures_patient_missingness_plot_by_default(self):
+        config = load_pipeline_config(ROOT / "config" / "pipeline.xml")
+        plotting = config["preprocessing"]["plotting"]["missingness_by_patient"]
+
+        self.assertTrue(plotting["run"])
+        self.assertEqual(
+            plotting["output"],
+            ROOT / "results" / "preoperative_missingness_heatmap.html",
+        )
+
+    def test_active_xml_configures_time_series_plotting_for_all_data(self):
+        config = load_pipeline_config(ROOT / "config" / "pipeline.xml")
+        plotting = config["preprocessing"]["plotting"]["time_series"]
+
+        self.assertTrue(plotting["run"])
+        self.assertEqual(plotting["group_by"], "parameter")
+        self.assertEqual(plotting["parameter_ids"], [])
+        self.assertEqual(plotting["class_names"], [])
+        self.assertEqual(plotting["patient_ids"], [])
+        self.assertEqual(plotting["output_directory"], ROOT / "results" / "time_series_plots")
+
+    def test_time_series_plot_filters_are_loaded_from_xml_items(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = ET.parse(ROOT / "config" / "pipeline.template.xml").getroot()
+            time_series = root.find("preprocessing/plotting/timeSeries")
+            time_series.find("run").text = "true"
+            time_series.find("groupBy").text = "class"
+            ET.SubElement(time_series.find("parameterIds"), "id").text = "during_creatinine"
+            ET.SubElement(time_series.find("classNames"), "name").text = "epic.LAB"
+            ET.SubElement(time_series.find("patientIds"), "id").text = "patient_002"
+            path = Path(temporary) / "config" / "pipeline.xml"
+            path.parent.mkdir()
+            ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
+
+            config = load_pipeline_config(path)
+            plotting = config["preprocessing"]["plotting"]["time_series"]
+
+            self.assertEqual(plotting["group_by"], "class")
+            self.assertEqual(plotting["parameter_ids"], ["during_creatinine"])
+            self.assertEqual(plotting["class_names"], ["epic.LAB"])
+            self.assertEqual(plotting["patient_ids"], ["patient_002"])
+            self.assertEqual(plotting["output_directory"], Path(temporary) / "results/time_series_plots")
+
+    def test_time_series_plotting_requires_export_when_preprocessing_runs(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = ET.parse(ROOT / "config" / "pipeline.template.xml").getroot()
+            root.find("preprocessing/run").text = "true"
+            root.find("preprocessing/plotting/timeSeries/run").text = "true"
+            path = Path(temporary) / "config" / "pipeline.xml"
+            path.parent.mkdir()
+            ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
+
+            with self.assertRaisesRegex(ValueError, "export_time_series=true"):
+                load_pipeline_config(path)
 
     def test_unknown_active_model_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -137,7 +252,7 @@ class PipelineConfigurationTests(unittest.TestCase):
             root.find("model/perceptron/novelData/modelInput").text = "results/perceptron_model.json"
             root.find("model/perceptron/novelData/predictions").text = "results/novel_predictions.csv"
             root.find("model/perceptron/plotting/run").text = "true"
-            root.find("model/perceptron/plotting/output").text = "results/perceptron_confusion_matrix.png"
+            root.find("model/perceptron/plotting/output").text = "results/perceptron_confusion_matrix.html"
             ET.indent(root, space="  ")
             tree.write(config_path, encoding="utf-8", xml_declaration=True)
             self.assertEqual(
@@ -156,7 +271,10 @@ class PipelineConfigurationTests(unittest.TestCase):
                 json.loads(model_path.read_text(encoding="utf-8"))["omitted_parameters"],
                 ["operation_diagnosis_proxy"],
             )
-            self.assertTrue((results / "perceptron_confusion_matrix.png").is_file())
+            self.assertTrue((results / "perceptron_confusion_matrix.html").is_file())
+            dashboard_html = (results / "patient_timeline_dashboard.html").read_text(encoding="utf-8")
+            self.assertIn("perceptron_confusion_matrix.html", dashboard_html)
+            self.assertIn("time_series_plots/", dashboard_html)
 
             root.find("model/perceptron/mode").text = "novel-data"
             root.find("model/perceptron/plotting/run").text = "false"
