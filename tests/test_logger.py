@@ -1,10 +1,17 @@
+"""
+Unit tests for the logger module.
+
+Author: Lorenzo Zambelli with contributions from ChatGPT
+"""
+
+
 import io
-from contextlib import redirect_stderr
-from pathlib import Path
 import tempfile
 import unittest
+from contextlib import redirect_stderr
+from pathlib import Path
 
-from src.logger import LogLevel, Logger
+from src.logging.logger import Logger, LogLevel
 
 
 class LoggerTests(unittest.TestCase):

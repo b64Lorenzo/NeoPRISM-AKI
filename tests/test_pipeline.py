@@ -6,9 +6,8 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 from src.cli import main
-from src.logger import Logger
-from src.pipeline import analyze_inputs, classify_outcome, load_parameter_map
-
+from src.logging.logger import Logger
+from src.preprocessing.row_pipeline import analyze_inputs, classify_outcome, load_parameter_map
 
 ROOT = Path(__file__).resolve().parents[1]
 PARAMETER_MAP = ROOT / "config" / "pipeline.xml"
@@ -195,7 +194,8 @@ class PipelineTests(unittest.TestCase):
         failure_values = tuple(
             value for rule in rules if rule["classification"] == "failure" for value in rule["values"]
         )
-        classify = lambda value: classify_outcome(value, success_values, failure_values)
+        def classify(value):
+            return classify_outcome(value, success_values, failure_values)
         self.assertEqual(classify("  MID CONDITION "), "success")
         self.assertEqual(classify("optimal condition"), "success")
         self.assertEqual(classify("severe problems"), "failure")

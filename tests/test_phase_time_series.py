@@ -7,9 +7,9 @@ import xml.etree.ElementTree as ET
 from contextlib import redirect_stderr
 from pathlib import Path
 
-from src.logger import Logger
-from src.parameter_map import load_parameter_map, write_parameter_map
-from src.patient_pipeline import analyze_inputs
+from src.logging.logger import Logger
+from src.preprocessing.parameters.parameter_map import load_parameter_map, write_parameter_map
+from src.preprocessing.patient_pipeline import analyze_inputs
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -104,9 +104,9 @@ class PhaseTimeSeriesTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             xml = ET.parse(ROOT / "config/pipeline.template.xml")
-            catalog = xml.getroot().find("preprocessing/relevantParameters")
+            catalog = xml.getroot().find("preprocessing/parameters")
             settings = catalog.find("settings")
-            settings.find("entry[@name='export_time_series']/boolean").text = "true"
+            settings.find("exportTimeSeries").text = "true"
             config = root / "config.xml"
             xml.write(config, encoding="utf-8", xml_declaration=True)
             source = root / "synthetic.csv"

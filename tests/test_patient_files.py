@@ -9,15 +9,15 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 from src.cli import main
-from src.logger import Logger
-from src.patient_pipeline import analyze_inputs
+from src.logging.logger import Logger
+from src.preprocessing.patient_pipeline import analyze_inputs
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class PatientFileGroupingTests(unittest.TestCase):
     def test_base_file_and_numbered_parts_are_one_patient_not_other_padded_ids(self):
-        from src.pipeline import group_patient_files
+        from src.utils.patient_files import group_patient_files
 
         groups = group_patient_files([
             Path("cohort/ref_0003.csv"),
@@ -33,7 +33,7 @@ class PatientFileGroupingTests(unittest.TestCase):
         ])
 
     def test_numbered_parts_without_base_share_family_but_folders_do_not(self):
-        from src.pipeline import group_patient_files
+        from src.utils.patient_files import group_patient_files
 
         groups = group_patient_files([
             Path("ward-a/case_2.csv"), Path("ward-a/case_1.csv"),
@@ -107,7 +107,7 @@ class PatientFileGroupingTests(unittest.TestCase):
             config = tree.getroot()
             config.find("logging/directory").text = "logs"
             config.find("preprocessing/run").text = "true"
-            config.find("preprocessing/inputs/path").text = "inputs"
+            config.find("preprocessing/inputDirectory").text = "inputs"
             config.find("preprocessing/outputDirectory").text = "results"
             config_path = project / "config/pipeline.xml"
             tree.write(config_path, encoding="utf-8", xml_declaration=True)

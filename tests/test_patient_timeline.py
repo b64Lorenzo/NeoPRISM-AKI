@@ -1,19 +1,18 @@
 """Synthetic tests for the patient timeline dashboard."""
 
 import csv
-from datetime import datetime
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
+from datetime import datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
-from src.pipeline_runner import run_pipeline
-
-from src.pipeline_config import load_pipeline_config
-from src.plotly_output import write_plotly_html
-from src.patient_timeline import PatientTimelineDashboard
+from src.pipeline.config import load_pipeline_config
+from src.pipeline.runner import run_pipeline
+from src.plotlib.plotly_output import write_plotly_html
+from src.preprocessing.plotting.patient_timeline.patient_timeline import PatientTimelineDashboard
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -65,7 +64,7 @@ class PatientTimelineTests(unittest.TestCase):
         with self.input.open("w", newline="", encoding="utf-8") as stream:
             csv.writer(stream).writerows(rows)
         output = self.root / "series-menu.html"
-        with patch("src.patient_timeline.write_plotly_html", wraps=write_plotly_html) as writer:
+        with patch("src.preprocessing.plotting.patient_timeline.patient_timeline.write_plotly_html", wraps=write_plotly_html) as writer:
             PatientTimelineDashboard(self.mapping).generate([self.input], output)
         figure = writer.call_args.args[0]
         self.assertEqual(len(figure.data), 2)
@@ -81,7 +80,7 @@ class PatientTimelineTests(unittest.TestCase):
 
     def test_all_phase_events_and_boundaries_share_one_timeline_without_series_markers(self):
         output = self.root / "phase-events.html"
-        with patch("src.patient_timeline.write_plotly_html", wraps=write_plotly_html) as writer:
+        with patch("src.preprocessing.plotting.patient_timeline.patient_timeline.write_plotly_html", wraps=write_plotly_html) as writer:
             PatientTimelineDashboard(self.mapping).generate([self.input], output)
         self.assertFalse(any(trace.name == "Timeline events" for trace in writer.call_args.args[0].data))
         page = output.read_text(encoding="utf-8")
@@ -97,7 +96,7 @@ class PatientTimelineTests(unittest.TestCase):
 
     def test_large_chart_has_toolbar_patient_selector_and_boundary_timeline(self):
         output = self.root / "timeline-layout.html"
-        with patch("src.patient_timeline.write_plotly_html", wraps=write_plotly_html) as writer:
+        with patch("src.preprocessing.plotting.patient_timeline.patient_timeline.write_plotly_html", wraps=write_plotly_html) as writer:
             PatientTimelineDashboard(self.mapping).generate([self.input], output, compare_all_patients=True)
         figure = writer.call_args.args[0]
         self.assertGreaterEqual(figure.layout.height, 700)
@@ -117,7 +116,7 @@ class PatientTimelineTests(unittest.TestCase):
         with self.input.open("w", newline="", encoding="utf-8") as stream:
             csv.writer(stream).writerows(rows)
         output = self.root / "untimed.html"
-        with patch("src.patient_timeline.write_plotly_html", wraps=write_plotly_html) as writer:
+        with patch("src.preprocessing.plotting.patient_timeline.patient_timeline.write_plotly_html", wraps=write_plotly_html):
             PatientTimelineDashboard(self.mapping).generate([self.input], output)
         events = PatientTimelineDashboard(self.mapping)._patient_dashboard_data("patient_001", (self.input,))["timeline_events"]
         for event in events:
@@ -131,7 +130,7 @@ class PatientTimelineTests(unittest.TestCase):
 
     def test_dashboard_is_compact_and_tables_are_rendered_on_demand(self):
         output = self.root / "compact.html"
-        with patch("src.patient_timeline.write_plotly_html", wraps=write_plotly_html) as write_plot:
+        with patch("src.preprocessing.plotting.patient_timeline.patient_timeline.write_plotly_html", wraps=write_plotly_html) as write_plot:
             PatientTimelineDashboard(self.mapping).generate([self.input], output)
         figure = write_plot.call_args.args[0]
         self.assertLessEqual(figure.layout.height, 900)
@@ -150,7 +149,7 @@ class PatientTimelineTests(unittest.TestCase):
     def test_dashboard_shows_phase_events_data_and_summary_by_patient(self):
         output = self.root / "patient-timeline.html"
         with patch(
-            "src.patient_timeline.write_plotly_html",
+            "src.preprocessing.plotting.patient_timeline.patient_timeline.write_plotly_html",
             wraps=write_plotly_html,
         ) as write_plot:
             result = PatientTimelineDashboard(self.mapping).generate(
@@ -270,7 +269,7 @@ class PatientTimelineTests(unittest.TestCase):
             ])
         output = self.root / "configured-durations.html"
 
-        with patch("src.patient_timeline.write_plotly_html", wraps=write_plotly_html) as write_plot:
+        with patch("src.preprocessing.plotting.patient_timeline.patient_timeline.write_plotly_html", wraps=write_plotly_html):
             PatientTimelineDashboard(mapping).generate([source], output)
 
         summary = output.read_text(encoding="utf-8")
@@ -297,7 +296,7 @@ class PatientTimelineTests(unittest.TestCase):
             ])
         output = self.root / "death-days.html"
 
-        with patch("src.patient_timeline.write_plotly_html", wraps=write_plotly_html) as write_plot:
+        with patch("src.preprocessing.plotting.patient_timeline.patient_timeline.write_plotly_html", wraps=write_plotly_html):
             PatientTimelineDashboard(self.mapping).generate([source], output)
 
         summary_text = output.read_text(encoding="utf-8")
@@ -321,7 +320,7 @@ class PatientTimelineTests(unittest.TestCase):
             writer.writerow([1_700_014_400, "Stop anesthesie", "", "60", ""])
         output = self.root / "death-day-zero.html"
 
-        with patch("src.patient_timeline.write_plotly_html", wraps=write_plotly_html) as write_plot:
+        with patch("src.preprocessing.plotting.patient_timeline.patient_timeline.write_plotly_html", wraps=write_plotly_html):
             PatientTimelineDashboard(self.mapping).generate([source], output)
 
         summary_text = output.read_text(encoding="utf-8")
@@ -342,7 +341,7 @@ class PatientTimelineTests(unittest.TestCase):
             writer.writerow([1_700_018_000, "ICU arrival", "", "70", "1"])
         output = self.root / "death-flag.html"
 
-        with patch("src.patient_timeline.write_plotly_html", wraps=write_plotly_html) as write_plot:
+        with patch("src.preprocessing.plotting.patient_timeline.patient_timeline.write_plotly_html", wraps=write_plotly_html):
             PatientTimelineDashboard(self.mapping).generate([source], output)
 
         summary_text = output.read_text(encoding="utf-8")
@@ -355,7 +354,7 @@ class PatientTimelineTests(unittest.TestCase):
         second_patient.write_text(self.input.read_text(encoding="utf-8"), encoding="utf-8")
         output = self.root / "multiple-patients.html"
         with patch(
-            "src.patient_timeline.write_plotly_html",
+            "src.preprocessing.plotting.patient_timeline.patient_timeline.write_plotly_html",
             wraps=write_plotly_html,
         ) as write_plot:
             result = PatientTimelineDashboard(self.mapping).generate(
@@ -397,7 +396,7 @@ class PatientTimelineTests(unittest.TestCase):
         related.write_text("<html>synthetic plot</html>", encoding="utf-8")
         output = self.root / "patient-timeline.html"
 
-        with patch("src.patient_timeline.write_plotly_html", wraps=write_plotly_html) as write_plot:
+        with patch("src.preprocessing.plotting.patient_timeline.patient_timeline.write_plotly_html", wraps=write_plotly_html) as write_plot:
             PatientTimelineDashboard(self.mapping).generate(
                 [self.input], output, related_plots=[related],
             )
@@ -462,10 +461,7 @@ class PatientTimelineTests(unittest.TestCase):
         root.find("logging/directory").text = "logs"
         preprocessing = root.find("preprocessing")
         preprocessing.find("run").text = "true"
-        inputs = preprocessing.find("inputs")
-        for child in list(inputs):
-            inputs.remove(child)
-        ET.SubElement(inputs, "path").text = str(input_dir)
+        preprocessing.find("inputDirectory").text = str(input_dir)
         preprocessing.find("outputDirectory").text = "results"
         plotting = preprocessing.find("plotting")
         plotting.find("run").text = "false"

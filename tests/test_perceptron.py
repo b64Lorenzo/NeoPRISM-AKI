@@ -5,8 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from src.perceptron import plot_confusion_matrix, train_model
-from src.plotly_output import write_plotly_html
+from src.models.perceptron.perceptron import plot_confusion_matrix, train_model
+from src.plotlib.plotly_output import write_plotly_html
 
 ROOT = Path(__file__).resolve().parents[1]
 PARAMETER_MAP = ROOT / "config" / "pipeline.xml"
@@ -32,7 +32,7 @@ class PerceptronTests(unittest.TestCase):
         }}
         with tempfile.TemporaryDirectory() as temporary:
             with patch(
-                "src.perceptron.write_plotly_html",
+                "src.models.perceptron.perceptron.write_plotly_html",
                 wraps=write_plotly_html,
             ) as write_plot:
                 plot_confusion_matrix(model, Path(temporary) / "confusion.html", theme="dark")
@@ -96,7 +96,7 @@ class PerceptronTests(unittest.TestCase):
             train_model(self.rows, self.parameters, omitted_parameters=["not_a_feature"])
 
     def test_join_uses_patient_id_and_rejects_unmatched_outcomes(self):
-        from src.cli import _join_patient_vectors
+        from src.utils.table_io import join_patient_vectors as _join_patient_vectors
 
         vectors = [{"patient_id": "a", "age": "2"}, {"patient_id": "b", "age": "8"}]
         outcomes = [{"patient_id": "b", "target": "1"}, {"patient_id": "a", "target": "-1"}]

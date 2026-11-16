@@ -1,6 +1,5 @@
 import csv
 import io
-import json
 import math
 import tempfile
 import unittest
@@ -9,17 +8,17 @@ from pathlib import Path
 from unittest.mock import patch
 
 from src.cli import main
-from src.logger import Logger
-from src.parameter_distributions import _plot_distribution, generate_parameter_distributions
-from src.patient_heatmaps import build_parameter_matrix, write_heatmap
-from src.patient_pipeline import analyze_inputs
-from src.plotly_output import write_plotly_html
-from src.outcome_rules import CreatinineStager, OutcomeClassifier
-from src.pipeline import load_parameter_map
-from src.parameter_map import write_parameter_map
-from src.postoperative import PostoperativeProcessor
-from src.preoperative import PreoperativeProcessor
-
+from src.logging.logger import Logger
+from src.plotlib.plotly_output import write_plotly_html
+from src.preprocessing.parameters.parameter_map import load_parameter_map, write_parameter_map
+from src.preprocessing.patient_pipeline import analyze_inputs
+from src.preprocessing.plotting.heatmaps import build_parameter_matrix, write_heatmap
+from src.preprocessing.plotting.parameter_distributions import (
+    _plot_distribution,
+    generate_parameter_distributions,
+)
+from src.preprocessing.postoperative.processor import PostoperativeProcessor
+from src.preprocessing.preoperative.processor import PreoperativeProcessor
 
 ROOT = Path(__file__).resolve().parents[1]
 PARAMETER_MAP = ROOT / "config" / "pipeline.xml"
@@ -122,9 +121,11 @@ class PatientVectorTests(unittest.TestCase):
             root = Path(temporary)
             source = self.make_patient(root, "patient.csv", missing_bmi=True)
             result = PreoperativeProcessor(load_parameter_map(PARAMETER_MAP)).process(source)
-            self.assertAlmostEqual(float(result.features["bmi"]), 20 / (1.1 ** 2), places=8)
+            self.assertAlmostEqual(float(result.features["bmi"]), 20 / (1.1**2), places=8)
 
-            source = self.make_patient(root, "missing-height.csv", missing_bmi=True, missing_height=True)
+            source = self.make_patient(
+                root, "missing-height.csv", missing_bmi=True, missing_height=True
+            )
             result = PreoperativeProcessor(load_parameter_map(PARAMETER_MAP)).process(source)
             self.assertEqual(result.features["bmi"], "")
 
@@ -137,7 +138,9 @@ class PatientVectorTests(unittest.TestCase):
     def test_one_file_becomes_one_preoperative_vector_with_binary_target(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            self.make_patient(root, "patient-a.csv", postop_creatinine="100")
+            self.make_patient(
+                root, "patient-a.csv", postop_creatinine="100", operation_result="severe problems"
+            )
             self.make_patient(root, "patient-b.csv", postop_creatinine="45", missing_bmi=True)
             self.make_patient(root, "patient-c.csv", postop_creatinine="", deceased="")
             self.run_analysis([root], root / "results", root / "logs")
@@ -147,24 +150,50 @@ class PatientVectorTests(unittest.TestCase):
             ) as stream:
                 patients = list(csv.DictReader(stream))
             self.assertEqual(len(patients), 3)
-            self.assertAlmostEqual(float(patients[1]["bmi"]), 20 / (1.1 ** 2), places=8)
+            self.assertAlmostEqual(float(patients[1]["bmi"]), 20 / (1.1**2), places=8)
             self.assertEqual(
                 list(patients[0]),
-                ["patient_id", "age", "sex", "weight", "height", "bmi", "asa", "operation_diagnosis_proxy", "baseline_creatinine", "baseline_hemoglobin"],
+                [
+                    "patient_id",
+                    "age",
+                    "sex",
+                    "weight",
+                    "height",
+                    "bmi",
+                    "asa",
+                    "operation_diagnosis_proxy",
+                    "baseline_creatinine",
+                    "baseline_hemoglobin",
+                ],
             )
             self.assertEqual(patients[0]["age"], "10")
             self.assertEqual(patients[0]["baseline_creatinine"], "40")
             self.assertNotIn("postoperative_creatinine_stage_screen", patients[0])
-            with (root / "results/patient_outcomes.csv").open(newline="", encoding="utf-8") as stream:
+            with (root / "results/patient_outcomes.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 outcomes = list(csv.DictReader(stream))
             self.assertEqual([row["target"] for row in outcomes], ["-1", "1", "NA"])
             self.assertEqual(outcomes[2]["target_status"], "unclassified")
-            with (root / "results/postoperative_measurements.csv").open(newline="", encoding="utf-8") as stream:
+            with (root / "results/postoperative_measurements.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 postoperative_measurements = list(csv.DictReader(stream))
-            self.assertEqual(postoperative_measurements[0]["aki_kdigo_stage"], "2")
-            self.assertNotIn("patient-a.csv", (root / "results/patient_vectors.csv").read_text(encoding="utf-8"))
+            self.assertEqual(postoperative_measurements[0]["postop_creatinine_72h"], "100")
+            self.assertNotIn(
+                "patient-a.csv", (root / "results/patient_vectors.csv").read_text(encoding="utf-8")
+            )
             csv_outputs = list((root / "results").glob("*.csv"))
-            self.assertEqual({path.name for path in csv_outputs}, {"patient_vectors.csv", "patient_outcomes.csv", "duringoperative_measurements.csv", "postoperative_measurements.csv", "time_series.csv"})
+            self.assertEqual(
+                {path.name for path in csv_outputs},
+                {
+                    "patient_vectors.csv",
+                    "patient_outcomes.csv",
+                    "duringoperative_measurements.csv",
+                    "postoperative_measurements.csv",
+                    "time_series.csv",
+                },
+            )
 
     def test_numeric_distribution_parses_values_before_annotations(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -185,20 +214,29 @@ class PatientVectorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             with patch(
-                "src.parameter_distributions.write_plotly_html",
+                "src.preprocessing.plotting.parameter_distributions.write_plotly_html",
                 wraps=write_plotly_html,
             ) as distribution_writer:
                 _plot_distribution(
-                    root / "distribution.html", "Synthetic", ["1", "2"], 4,
-                    numeric_expected=True, theme="dark",
+                    root / "distribution.html",
+                    "Synthetic",
+                    ["1", "2"],
+                    4,
+                    numeric_expected=True,
+                    theme="dark",
                 )
             with patch(
-                "src.patient_heatmaps.write_plotly_html",
+                "src.preprocessing.plotting.heatmaps.write_plotly_html",
                 wraps=write_plotly_html,
             ) as heatmap_writer:
                 write_heatmap(
-                    root / "heatmap.html", [[0.0, 1.0]], ["patient_001"],
-                    ["a", "b"], "Synthetic heatmap", "Value", theme="dark",
+                    root / "heatmap.html",
+                    [[0.0, 1.0]],
+                    ["patient_001"],
+                    ["a", "b"],
+                    "Synthetic heatmap",
+                    "Value",
+                    theme="dark",
                 )
 
             self.assertEqual(
@@ -227,12 +265,16 @@ class PatientVectorTests(unittest.TestCase):
             self.assertEqual(patient["baseline_creatinine"], "40")
             self.assertEqual(patient["baseline_hemoglobin"], "8.1")
             self.assertNotIn("target", patient)
-            with (output / "postoperative_measurements.csv").open(newline="", encoding="utf-8") as stream:
+            with (output / "postoperative_measurements.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 postoperative = next(csv.DictReader(stream))
             self.assertEqual(postoperative["postop_creatinine_72h"], "45")
 
             generate_parameter_distributions(output, PARAMETER_MAP, phase="preoperative")
-            with (output / "parameter_distribution_summary.csv").open(newline="", encoding="utf-8") as stream:
+            with (output / "parameter_distribution_summary.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 summaries = {row["parameter_id"]: row for row in csv.DictReader(stream)}
             for parameter_id in ("baseline_creatinine", "baseline_hemoglobin"):
                 self.assertEqual(summaries[parameter_id]["kind"], "numeric")
@@ -260,7 +302,9 @@ class PatientVectorTests(unittest.TestCase):
             with redirect_stderr(io.StringIO()), Logger(log_root=root / "logs") as logger:
                 analyze_inputs([source], root / "results", config_path, logger)
 
-            with (root / "results/patient_outcomes.csv").open(newline="", encoding="utf-8") as stream:
+            with (root / "results/patient_outcomes.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 outcome = next(csv.DictReader(stream))
             self.assertEqual(outcome["target"], "NA")
             self.assertEqual(outcome["target_status"], "unclassified")
@@ -271,32 +315,45 @@ class PatientVectorTests(unittest.TestCase):
         catalog = load_parameter_map(PARAMETER_MAP)
         phases = {parameter["phase"] for parameter in catalog["parameters"]}
         self.assertEqual(phases, {"Pre-operative", "During-operative", "Post-operative"})
-        self.assertEqual(len(catalog["parameters"]), 21)
+        self.assertEqual(len(catalog["parameters"]), 20)
         required = {
-            "clinical_parameter", "role", "priority", "exact_field_names",
-            "workbook_exact_field_entry", "workbook_row", "extraction_definition",
-            "parameter_type", "unit", "value_range",
+            "clinical_parameter",
+            "role",
+            "priority",
+            "exact_field_names",
+            "extraction_definition",
+            "parameter_type",
+            "unit",
+            "value_range",
         }
         self.assertTrue(all(required.issubset(parameter) for parameter in catalog["parameters"]))
         age = next(parameter for parameter in catalog["parameters"] if parameter["id"] == "age")
         self.assertEqual(age["clinical_parameter"], "Age")
         self.assertEqual(age["exact_field_names"], ["epic.DEMOGRAPHICS.age"])
-        self.assertEqual(age["workbook_row"], 6)
+        self.assertNotIn("workbook_row", age)
         self.assertEqual(len(PreoperativeProcessor(catalog).parameters), 9)
-        self.assertEqual(len(PostoperativeProcessor(catalog).parameters), 11)
+        self.assertEqual(len(PostoperativeProcessor(catalog).parameters), 10)
         self.assertNotIn("operation_duration", PreoperativeProcessor(catalog).parameters)
         self.assertNotIn("operation_duration", PostoperativeProcessor(catalog).parameters)
 
     def test_unknown_patient_record_scope_is_rejected(self):
         mapping = load_parameter_map(PARAMETER_MAP)
-        measurement = next(item for item in mapping["postoperative_measurements"] if item["id"] == "recorded_death_days")
+        measurement = next(
+            item
+            for item in mapping["postoperative_measurements"]
+            if item["id"] == "recorded_death_days"
+        )
         measurement["record_scope"] = "patinet"
         with self.assertRaisesRegex(ValueError, "Unsupported record_scope"):
             PostoperativeProcessor(mapping)
 
     def test_patient_record_scope_cannot_have_postoperative_window(self):
         mapping = load_parameter_map(PARAMETER_MAP)
-        measurement = next(item for item in mapping["postoperative_measurements"] if item["id"] == "recorded_death_days")
+        measurement = next(
+            item
+            for item in mapping["postoperative_measurements"]
+            if item["id"] == "recorded_death_days"
+        )
         measurement["window_hours"] = 72
         with self.assertRaisesRegex(ValueError, "patient record_scope cannot have window_hours"):
             PostoperativeProcessor(mapping)
@@ -313,18 +370,20 @@ class PatientVectorTests(unittest.TestCase):
             postoperative_result = postoperative.process(source, preoperative_result)
 
             expected_preoperative = [
-                item["id"] for item in parameter_map["parameters"]
+                item["id"]
+                for item in parameter_map["parameters"]
                 if item["phase"] == "Pre-operative"
             ]
             expected_postoperative = [
-                item["id"] for item in parameter_map["parameters"]
+                item["id"]
+                for item in parameter_map["parameters"]
                 if item["phase"] == "Post-operative"
             ]
             self.assertEqual(list(preoperative.parameters), expected_preoperative)
             self.assertEqual(list(postoperative.parameters), expected_postoperative)
             self.assertEqual(preoperative_result.features["age"], "10")
             self.assertFalse(hasattr(preoperative_result, "target"))
-            self.assertEqual(postoperative_result.target, -1)
+            self.assertEqual(postoperative_result.target, 1)
             self.assertEqual(postoperative_result.measurements["postop_creatinine_72h"], "100")
 
     def test_preoperative_cutoff_blocks_postoperative_values_from_features(self):
@@ -344,19 +403,27 @@ class PatientVectorTests(unittest.TestCase):
             ) as stream:
                 patient = next(csv.DictReader(stream))
             self.assertEqual(patient["age"], "10")
-            with (root / "results/patient_outcomes.csv").open(newline="", encoding="utf-8") as stream:
+            with (root / "results/patient_outcomes.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 outcome = next(csv.DictReader(stream))
             self.assertEqual(outcome["target"], "1")
 
     def test_missingness_and_cleanest_complete_case_heatmap(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            self.make_patient(root, "patient-a.csv", postop_creatinine="100")
+            self.make_patient(
+                root, "patient-a.csv", postop_creatinine="100", operation_result="severe problems"
+            )
             self.make_patient(root, "patient-b.csv", postop_creatinine="45")
-            self.make_patient(root, "patient-c.csv", postop_creatinine="", deceased="", missing_height=True)
+            self.make_patient(
+                root, "patient-c.csv", postop_creatinine="", deceased="", missing_height=True
+            )
             self.run_analysis([root], root / "results", root / "logs")
 
-            with (root / "results/patient_vectors.csv").open(newline="", encoding="utf-8") as stream:
+            with (root / "results/patient_vectors.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 vectors = list(csv.DictReader(stream))
             self.assertEqual(len(vectors), 3)
             self.assertEqual(vectors[2]["height"], "")
@@ -380,7 +447,11 @@ class PatientVectorTests(unittest.TestCase):
                     for parameter in load_parameter_map(PARAMETER_MAP)["parameters"]
                     if parameter["phase"] == "Post-operative"
                 }
-                self.assertTrue(configured_postoperative_ids.issubset(set(postoperative_reader.fieldnames or [])))
+                self.assertTrue(
+                    configured_postoperative_ids.issubset(
+                        set(postoperative_reader.fieldnames or [])
+                    )
+                )
             self.assertEqual(postoperative[0]["postop_creatinine_72h"], "100")
             self.assertEqual(postoperative[0]["prism_ii"], "7")
             measurement_specs = load_parameter_map(PARAMETER_MAP)["postoperative_measurements"]
@@ -392,7 +463,12 @@ class PatientVectorTests(unittest.TestCase):
                 measurement_specs,
                 value_key="postoperative_measurements",
             )
-            self.assertTrue(all(any(spec["id"] in label for label in heatmap_labels) for spec in measurement_specs))
+            self.assertTrue(
+                all(
+                    any(spec["id"] in label for label in heatmap_labels)
+                    for spec in measurement_specs
+                )
+            )
             self.assertEqual(len(list((root / "results").glob("*.csv"))), 5)
 
     def test_patient_missingness_heatmap_uses_configured_plotly_output(self):
@@ -403,7 +479,10 @@ class PatientVectorTests(unittest.TestCase):
             plot = output / "diagnostics" / "missing_by_patient.html"
             with redirect_stderr(io.StringIO()), Logger(log_root=root / "logs") as logger:
                 analyze_inputs(
-                    [source], output, PARAMETER_MAP, logger,
+                    [source],
+                    output,
+                    PARAMETER_MAP,
+                    logger,
                     generate_plots=False,
                     generate_patient_missingness=True,
                     patient_missingness_output=plot,
@@ -421,9 +500,13 @@ class PatientVectorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             self.make_patient(root, "patient-a.csv", postop_creatinine="", deceased="yes")
-            self.make_patient(root, "patient-b.csv", postop_creatinine="", operation_result="severe problems")
+            self.make_patient(
+                root, "patient-b.csv", postop_creatinine="", operation_result="severe problems"
+            )
             self.run_analysis([root], root / "results", root / "logs")
-            with (root / "results/patient_outcomes.csv").open(newline="", encoding="utf-8") as stream:
+            with (root / "results/patient_outcomes.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 targets = [row["target"] for row in csv.DictReader(stream)]
             self.assertEqual(targets, ["-1", "-1"])
 
@@ -434,11 +517,17 @@ class PatientVectorTests(unittest.TestCase):
                 root, "patient.csv", days_mortality="0", deceased="0", postop_creatinine=""
             )
             self.run_analysis([source], root / "results", root / "logs")
-            with (root / "results/patient_vectors.csv").open(newline="", encoding="utf-8") as stream:
+            with (root / "results/patient_vectors.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 vectors = next(csv.DictReader(stream))
-            with (root / "results/postoperative_measurements.csv").open(newline="", encoding="utf-8") as stream:
+            with (root / "results/postoperative_measurements.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 measurements = next(csv.DictReader(stream))
-            with (root / "results/patient_outcomes.csv").open(newline="", encoding="utf-8") as stream:
+            with (root / "results/patient_outcomes.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 outcome = next(csv.DictReader(stream))
             self.assertNotIn("recorded_death_days", vectors)
             self.assertEqual(measurements["recorded_death_days"], "0")
@@ -450,24 +539,35 @@ class PatientVectorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             source = self.make_patient(
-                root, "patient.csv", days_mortality="-1", later_days_mortality="4",
-                deceased="", postop_creatinine="",
+                root,
+                "patient.csv",
+                days_mortality="-1",
+                later_days_mortality="4",
+                deceased="",
+                postop_creatinine="",
             )
             self.run_analysis([source], root / "results", root / "logs")
-            with (root / "results/postoperative_measurements.csv").open(newline="", encoding="utf-8") as stream:
+            with (root / "results/postoperative_measurements.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 measurements = next(csv.DictReader(stream))
-            with (root / "results/patient_outcomes.csv").open(newline="", encoding="utf-8") as stream:
+            with (root / "results/patient_outcomes.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 outcome = next(csv.DictReader(stream))
             self.assertEqual(measurements["recorded_death_days"], "4")
-            self.assertEqual((outcome["target"], outcome["label_basis"]),
-                             ("-1", "recorded_death_days"))
+            self.assertEqual(
+                (outcome["target"], outcome["label_basis"]), ("-1", "recorded_death_days")
+            )
 
     def test_survival_flag_without_other_outcome_evidence_is_success(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             source = self.make_patient(root, "patient.csv", postop_creatinine="", deceased="0")
             self.run_analysis([source], root / "results", root / "logs")
-            with (root / "results/patient_outcomes.csv").open(newline="", encoding="utf-8") as stream:
+            with (root / "results/patient_outcomes.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 patient = next(csv.DictReader(stream))
             self.assertEqual(patient["target"], "1")
 
@@ -478,12 +578,16 @@ class PatientVectorTests(unittest.TestCase):
             stdout = io.StringIO()
             stderr = io.StringIO()
             with redirect_stdout(stdout), redirect_stderr(stderr):
-                result = main([
-                    "analyze",
-                    str(root),
-                    "--output", str(root / "results"),
-                    "--log-dir", str(root / "logs"),
-                ])
+                result = main(
+                    [
+                        "analyze",
+                        str(root),
+                        "--output",
+                        str(root / "results"),
+                        "--log-dir",
+                        str(root / "logs"),
+                    ]
+                )
             self.assertEqual(result, 0)
             self.assertIn("1 patient(s) analyzed", stdout.getvalue())
             self.assertNotIn("one patient per file", stdout.getvalue())
@@ -494,30 +598,49 @@ class PatientVectorTests(unittest.TestCase):
     def test_distributions_command_generates_per_parameter_plots_and_summary(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            self.make_patient(root, "patient-a.csv", postop_creatinine="100")
+            self.make_patient(
+                root, "patient-a.csv", postop_creatinine="100", operation_result="severe problems"
+            )
             self.make_patient(root, "patient-b.csv", postop_creatinine="45")
             stdout = io.StringIO()
             with redirect_stdout(stdout), redirect_stderr(io.StringIO()):
-                result = main([
-                    "distributions",
-                    str(root),
-                    "--output", str(root / "results"),
-                    "--log-dir", str(root / "logs"),
-                ])
+                result = main(
+                    [
+                        "distributions",
+                        str(root),
+                        "--output",
+                        str(root / "results"),
+                        "--log-dir",
+                        str(root / "logs"),
+                    ]
+                )
             self.assertEqual(result, 0)
             plots = root / "results" / "parameter_distributions"
             self.assertTrue((plots / "preoperative_age.html").is_file())
             self.assertTrue((plots / "preoperative_operation_diagnosis_proxy.html").is_file())
             self.assertTrue((plots / "postoperative_postop_creatinine_72h.html").is_file())
-            summary = (root / "results" / "parameter_distribution_summary.csv").read_text(encoding="utf-8")
-            self.assertIn("operation_diagnosis_proxy,Operation / diagnosis proxy,Pre-operative,categorical,2,2", summary)
-            self.assertIn("postop_creatinine_72h,Creatinine first 72 h,Post-operative,numeric,2,2", summary)
+            summary = (root / "results" / "parameter_distribution_summary.csv").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(
+                "operation_diagnosis_proxy,Operation / diagnosis proxy,Pre-operative,categorical,2,2",
+                summary,
+            )
+            self.assertIn(
+                "postop_creatinine_72h,Creatinine first 72 h,Post-operative,numeric,2,2", summary
+            )
             self.assertIn("distribution", stdout.getvalue().lower())
 
     def test_heatmap_matrix_keeps_all_missing_configured_parameters(self):
         patients = [
-            {"patient_id": "patient_001", "postoperative_measurements": {"observed": "12", "empty": ""}},
-            {"patient_id": "patient_002", "postoperative_measurements": {"observed": "18", "empty": ""}},
+            {
+                "patient_id": "patient_001",
+                "postoperative_measurements": {"observed": "12", "empty": ""},
+            },
+            {
+                "patient_id": "patient_002",
+                "postoperative_measurements": {"observed": "18", "empty": ""},
+            },
         ]
         matrix, labels = build_parameter_matrix(
             patients,
@@ -536,29 +659,13 @@ class PatientVectorTests(unittest.TestCase):
             source.write_text("unknown_column\nvalue\n", encoding="utf-8")
             self.run_analysis([source], root / "results", root / "logs")
             self.assertTrue((root / "results/preoperative_heatmap.html").is_file())
-            with (root / "results/patient_vectors.csv").open(newline="", encoding="utf-8") as stream:
+            with (root / "results/patient_vectors.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 vectors = list(csv.DictReader(stream))
             self.assertEqual(len(vectors), 1)
             self.assertNotIn("target", vectors[0])
             self.assertEqual(len(list((root / "results").glob("*.csv"))), 5)
-
-    def test_creatinine_staging_uses_configured_xml_thresholds_and_time_windows(self):
-        hour = 3600
-        rules = load_parameter_map(PARAMETER_MAP)["creatinine_staging_rules"]
-        stager = CreatinineStager(rules)
-        self.assertEqual(stager.stage(40, 0, [(hour, 60)]), 1)
-        self.assertEqual(stager.stage(40, 0, [(hour, 80)]), 2)
-        self.assertEqual(stager.stage(200, 0, [(hour, 360)]), 3)
-        self.assertEqual(stager.stage(100, 0, [(hour, 70)]), 0)
-        self.assertIsNone(stager.stage(40, 0, [(8 * 24 * hour, 100)]))
-        self.assertEqual(
-            stager.stage(40, 0, [(8 * 24 * hour, 50), (8 * 24 * hour + hour, 80)]),
-            1,
-        )
-
-        changed_rules = json.loads(json.dumps(rules))
-        changed_rules["ratio_stages"][-1]["minimum_ratio"] = 1.2
-        self.assertEqual(CreatinineStager(changed_rules).stage(40, 0, [(hour, 50)]), 1)
 
     def test_parameter_criteria_classify_measurements_without_a_score(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -570,7 +677,9 @@ class PatientVectorTests(unittest.TestCase):
                 postop_ventilation="7",
             )
             parameter_map = load_parameter_map(PARAMETER_MAP)
-            ventilation = next(item for item in parameter_map["parameters"] if item["id"] == "ventilation_duration")
+            ventilation = next(
+                item for item in parameter_map["parameters"] if item["id"] == "ventilation_duration"
+            )
             ventilation["outcome_criteria"] = {
                 "success": {"operator": "lte", "value": 7},
                 "failure": {"operator": "gt", "value": 7},
@@ -580,23 +689,50 @@ class PatientVectorTests(unittest.TestCase):
             write_parameter_map(config, parameter_map)
             with redirect_stderr(io.StringIO()), Logger(log_root=root / "logs") as logger:
                 analyze_inputs([source], root / "results", config, logger)
-            with (root / "results/patient_outcomes.csv").open(newline="", encoding="utf-8") as stream:
+            with (root / "results/patient_outcomes.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 patient = next(csv.DictReader(stream))
             self.assertEqual(patient["target"], "1")
             self.assertNotIn("outcome_score", patient)
             self.assertEqual(patient["target_status"], "success")
-            with (root / "results/postoperative_measurements.csv").open(newline="", encoding="utf-8") as stream:
+            with (root / "results/postoperative_measurements.csv").open(
+                newline="", encoding="utf-8"
+            ) as stream:
                 measurements = next(csv.DictReader(stream))
             self.assertEqual(measurements["ventilation_duration"], "7")
 
     def test_category_mapping_uses_xml_rules_and_preserves_unknown(self):
         parameter_map = load_parameter_map(PARAMETER_MAP)
-        self.assertEqual(PostoperativeProcessor(parameter_map).classifier.classify({}, categories=["optimal condition"]).target, 1)
-        self.assertEqual(PostoperativeProcessor(parameter_map).classifier.classify({}, categories=["mid condition"]).target, 1)
-        self.assertEqual(PostoperativeProcessor(parameter_map).classifier.classify({}, categories=["severe problems"]).target, -1)
-        self.assertEqual(PostoperativeProcessor(parameter_map).classifier.classify({}, categories=["death"]).target, -1)
-        self.assertIsNone(PostoperativeProcessor(parameter_map).classifier.classify({}, categories=["other / unknown"]).target)
-
+        self.assertEqual(
+            PostoperativeProcessor(parameter_map)
+            .classifier.classify({}, categories=["optimal condition"])
+            .target,
+            1,
+        )
+        self.assertEqual(
+            PostoperativeProcessor(parameter_map)
+            .classifier.classify({}, categories=["mid condition"])
+            .target,
+            1,
+        )
+        self.assertEqual(
+            PostoperativeProcessor(parameter_map)
+            .classifier.classify({}, categories=["severe problems"])
+            .target,
+            -1,
+        )
+        self.assertEqual(
+            PostoperativeProcessor(parameter_map)
+            .classifier.classify({}, categories=["death"])
+            .target,
+            -1,
+        )
+        self.assertIsNone(
+            PostoperativeProcessor(parameter_map)
+            .classifier.classify({}, categories=["other / unknown"])
+            .target
+        )
 
 
 if __name__ == "__main__":

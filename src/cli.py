@@ -4,24 +4,18 @@ from __future__ import annotations
 
 import argparse
 import csv
-import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
-from src.logger import LogLevel, Logger
-from src.parameter_distributions import generate_parameter_distributions
-from src.patient_pipeline import analyze_inputs
-from src.perceptron import train_model
-from src.pipeline_runner import run_pipeline
-from src.pipeline_config import load_pipeline_config
-from src.parameter_map import load_parameter_map
-from src.time_series_plots import TimeSeriesPlotter
-from src.training_io import (
-    join_patient_vectors as _join_patient_vectors,
-    read_csv_rows as _read_csv_rows,
-    write_csv_rows as _write_csv_rows,
-)
-
+from src.logging.logger import Logger, LogLevel
+from src.models.perceptron.runner import train_and_save
+from src.models.training_validation.config import TrainingValidationConfig
+from src.pipeline.config import load_pipeline_config
+from src.pipeline.runner import run_pipeline
+from src.preprocessing.parameters.parameter_map import load_parameter_map
+from src.preprocessing.patient_pipeline import analyze_inputs
+from src.preprocessing.plotting.parameter_distributions import generate_parameter_distributions
+from src.preprocessing.plotting.time_series.time_series_plots import TimeSeriesPlotter
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PARAMETER_MAP = ROOT / "config" / "pipeline.xml"
@@ -41,58 +35,51 @@ def build_parser() -> argparse.ArgumentParser:
         description="Build one pre-operative feature vector per patient CSV and assess outcomes from post-operative data.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--parameter-map", type=Path, default=DEFAULT_PARAMETER_MAP, help="pipeline XML containing parameter definitions")
+    common.add_argument("--log-dir", type=Path, default=Path("logs"), help="logger output directory (default: logs)")
+    common.add_argument("--verbose", action="store_true", help="include debug-level events")
     run = commands.add_parser("run", help="run configured preprocessing and model stages from XML")
     run.add_argument("--config", type=Path, default=DEFAULT_PIPELINE_CONFIG, help="XML run configuration")
 
-    extract = commands.add_parser("analyze", help="analyze one or more CSV files or directories")
+    extract = commands.add_parser("analyze", parents=[common], help="analyze one or more CSV files or directories")
     extract.add_argument("inputs", nargs="+", type=Path, help="CSV file(s) or directories to search recursively")
     extract.add_argument("--output", type=Path, default=Path("results"), help="artifact directory (default: results)")
-    extract.add_argument("--parameter-map", type=Path, default=DEFAULT_PARAMETER_MAP, help="pipeline XML configuration containing relevant parameters")
     extract.add_argument("--outcome-column", help="optional direct postoperative outcome column; default: configured columns")
     extract.add_argument("--success-values", type=_values, help="comma-separated exact success categories (defaults from parameter map)")
     extract.add_argument("--failure-values", type=_values, help="comma-separated exact failure categories (defaults from parameter map)")
-    extract.add_argument("--log-dir", type=Path, default=Path("logs"), help="logger output directory (default: logs)")
-    extract.add_argument("--verbose", action="store_true", help="include debug-level events")
 
     distributions = commands.add_parser(
-        "distributions",
+        "distributions", parents=[common],
         help="plot the value distribution of every mapped pre-, during-, or post-operative parameter",
     )
     distributions.add_argument("inputs", nargs="+", type=Path, help="CSV file(s) or directories to search recursively")
     distributions.add_argument("--output", type=Path, default=Path("results"), help="artifact directory (default: results)")
-    distributions.add_argument("--parameter-map", type=Path, default=DEFAULT_PARAMETER_MAP, help="pipeline XML configuration containing relevant parameters")
     distributions.add_argument("--phase", choices=("all", "preoperative", "duringoperative", "postoperative"), default="all", help="which parameter phase to plot")
     distributions.add_argument("--bins", type=_positive_int, default=20, help="numeric histogram bins (default: 20)")
-    distributions.add_argument("--log-dir", type=Path, default=Path("logs"), help="logger output directory (default: logs)")
-    distributions.add_argument("--verbose", action="store_true", help="include debug-level events")
 
     time_series = commands.add_parser(
-        "plot-time-series",
+        "plot-time-series", parents=[common],
         help="plot configured time-series readings for one or more patients",
     )
     time_series.add_argument("--input", type=Path, default=Path("results/time_series.csv"), help="preprocessed time_series.csv")
     time_series.add_argument("--output", type=Path, default=Path("results/time_series_plots"), help="plot directory")
-    time_series.add_argument("--parameter-map", type=Path, default=DEFAULT_PARAMETER_MAP, help="XML containing the configured time-series parameters and classes")
     time_series.add_argument("--group-by", choices=("parameter", "class"), default="parameter", help="make one chart per parameter or class")
     time_series.add_argument("--parameter", dest="parameters", action="append", type=_values, default=[], help="parameter ID(s), comma-separated; repeat to add more (default: all)")
     time_series.add_argument("--class", dest="classes", action="append", type=_values, default=[], help="class name(s), comma-separated; repeat to add more")
     time_series.add_argument("--patient", dest="patients", action="append", type=_values, default=[], help="pseudonymous patient ID(s), comma-separated; default: all")
-    time_series.add_argument("--log-dir", type=Path, default=Path("logs"), help="logger output directory (default: logs)")
-    time_series.add_argument("--verbose", action="store_true", help="include debug-level events")
 
-    train = commands.add_parser("train-perceptron", help="train and validate a binary perceptron")
+
+    train = commands.add_parser("train-perceptron", parents=[common], help="train and validate a binary perceptron")
     train.add_argument("--input", type=Path, default=Path("results/patient_vectors.csv"), help="pre-operative feature-only vectors CSV")
     train.add_argument("--outcomes", type=Path, default=Path("results/patient_outcomes.csv"), help="post-operative labels keyed by patient_id")
     train.add_argument("--training-set", type=Path, default=Path("results/training_set.csv"), help="output labeled training rows")
     train.add_argument("--validation-set", type=Path, default=Path("results/validation_set.csv"), help="output validation features and predictions; no true target")
     train.add_argument("--model", type=Path, default=Path("results/perceptron_model.json"), help="output model and aggregate validation metrics")
-    train.add_argument("--parameter-map", type=Path, default=DEFAULT_PARAMETER_MAP, help="pipeline XML configuration containing relevant parameters")
     train.add_argument("--train-fraction", type=float, default=0.8, help="random fraction used for training; remaining rows validate")
     train.add_argument("--epochs", type=_positive_int, default=100, help="maximum training passes (default: 100)")
     train.add_argument("--seed", type=int, default=0, help="random split seed")
     train.add_argument("--omit", type=_values, default=(), help="additional comma-separated parameter IDs to omit; defaults come from the XML configuration")
-    train.add_argument("--log-dir", type=Path, default=Path("logs"), help="logger output directory (default: logs)")
-    train.add_argument("--verbose", action="store_true", help="include debug-level events")
     return parser
 
 
@@ -114,6 +101,7 @@ def main(argv: list[str] | None = None) -> int:
             message = run_pipeline(args.config)
             print(f"XML pipeline complete: {message}")
             return 0
+
         level = LogLevel.DEBUG if args.verbose else LogLevel.INFO
         with Logger(minimum_level=level, log_root=args.log_dir) as logger:
             logger.write(LogLevel.INFO, "cli", f"starting {args.command}")
@@ -158,32 +146,16 @@ def main(argv: list[str] | None = None) -> int:
                     f"Artifacts: {args.output}"
                 )
             else:
-                _, vector_rows = _read_csv_rows(args.input)
-                _, outcome_rows = _read_csv_rows(args.outcomes)
-                rows = _join_patient_vectors(vector_rows, outcome_rows)
                 run_config = load_pipeline_config(args.parameter_map)
-                parameter_map = run_config["preprocessing"]["parameter_map"]
                 configured_omit = run_config["model"]["models"]["perceptron"]["training_validation"]["omit"]
-                parameters = [
-                    parameter for parameter in parameter_map["parameters"]
-                    if parameter["phase"] == "Pre-operative"
-                ]
-                model = train_model(
-                    rows,
-                    parameters,
-                    omitted_parameters=list(dict.fromkeys((*args.omit, *configured_omit))),
-                    train_fraction=args.train_fraction,
-                    epochs=args.epochs,
-                    seed=args.seed,
-                    include_sets=True,
+                settings = TrainingValidationConfig(
+                    vectors=args.input, outcomes=args.outcomes,
+                    training_set=args.training_set, validation_set=args.validation_set,
+                    model_output=args.model, train_fraction=args.train_fraction,
+                    epochs=args.epochs, seed=args.seed,
+                    omit=list(dict.fromkeys((*args.omit, *configured_omit))),
                 )
-                training_rows = model.pop("_training_set")
-                validation_rows = model.pop("_validation_set")
-                feature_ids = model["feature_ids"]
-                _write_csv_rows(args.training_set, training_rows, ["patient_id", *feature_ids, "target"])
-                _write_csv_rows(args.validation_set, validation_rows, ["patient_id", *feature_ids, "prediction"])
-                args.model.parent.mkdir(parents=True, exist_ok=True)
-                args.model.write_text(json.dumps(model, indent=2) + "\n", encoding="utf-8")
+                model = train_and_save(settings, run_config["preprocessing"]["parameter_map"])
                 logger.write(
                     LogLevel.INFO,
                     "perceptron",

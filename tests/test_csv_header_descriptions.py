@@ -9,8 +9,8 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 from src.cli import main
-from src.csv_header_descriptions import write_csv_header_descriptions
-from src.pipeline_config import load_pipeline_config
+from src.pipeline.config import load_pipeline_config
+from src.preprocessing.csv_header_descriptions.inventory import write_csv_header_descriptions
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -143,7 +143,7 @@ class CsvHeaderDescriptionTests(unittest.TestCase):
             config_path = project / "config" / "pipeline.xml"
             tree = ET.parse(ROOT / "config" / "pipeline.template.xml")
             root = tree.getroot()
-            root.find("preprocessing/inputs/path").text = "data/patients"
+            root.find("preprocessing/inputDirectory").text = "data/patients"
             root.find("preprocessing/outputDirectory").text = "results"
             root.find("logging/directory").text = "logs"
             node = root.find("preprocessing/csvHeaderDescriptions")

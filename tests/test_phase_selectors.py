@@ -9,12 +9,12 @@ import xml.etree.ElementTree as ET
 from copy import deepcopy
 from pathlib import Path
 
-from src.outcome_rules import OutcomeClassifier
-from src.patient_pipeline import analyze_inputs
-from src.pipeline_config import load_pipeline_config
-from src.postoperative import PostoperativeProcessor
-from src.preoperative import PreoperativeProcessor
-from src.pipeline_runner import run_pipeline
+from src.pipeline.config import load_pipeline_config
+from src.pipeline.runner import run_pipeline
+from src.preprocessing.patient_pipeline import analyze_inputs
+from src.preprocessing.postoperative.outcome_rules import OutcomeClassifier
+from src.preprocessing.postoperative.processor import PostoperativeProcessor
+from src.preprocessing.preoperative.processor import PreoperativeProcessor
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -22,9 +22,11 @@ ROOT = Path(__file__).resolve().parents[1]
 class PhaseSelectorTests(unittest.TestCase):
     @staticmethod
     def empty_phases(catalog):
-        pre, during, post = (catalog.find(tag) for tag in ("pre", "during", "post"))
+        pre, during, post = (catalog.find(tag) for tag in ("preOperative", "duringOperative", "postOperative"))
         for section in (pre, during, post):
-            section.clear()
+            for child in list(section):
+                if child.tag not in {"endEvent", "includeIds", "excludeIds"}:
+                    section.remove(child)
         return pre, during, post
 
     @staticmethod
@@ -33,21 +35,21 @@ class PhaseSelectorTests(unittest.TestCase):
 
     @staticmethod
     def keep_parameters(catalog, ids):
-        for section in (catalog.find(tag) for tag in ("pre", "during", "post")):
+        for section in (catalog.find(tag) for tag in ("preOperative", "duringOperative", "postOperative")):
             for group in list(section):
                 if group.tag == "class":
                     for parameter in list(group):
-                        if parameter.get("id") not in ids:
+                        if parameter.tag == "parameter" and parameter.get("id") not in ids:
                             group.remove(parameter)
-                    if not len(group):
+                    if not group.findall("parameter"):
                         section.remove(group)
-                elif group.get("id") not in ids:
+                elif group.tag not in {"endEvent", "includeIds", "excludeIds"} and group.get("id") not in ids:
                     section.remove(group)
 
     def test_class_expands_only_catalogued_parameters_of_its_phase(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = ET.parse(ROOT / "config/pipeline.template.xml").getroot()
-            catalog = root.find("preprocessing/relevantParameters")
+            catalog = root.find("preprocessing/parameters")
             ids = {"age", "sex", "weight", "height", "bmi", "asa", "recorded_death_days"}
             self.keep_parameters(catalog, ids)
             path = Path(temporary) / "config" / "pipeline.xml"
@@ -62,8 +64,8 @@ class PhaseSelectorTests(unittest.TestCase):
     def test_post_outcome_rule_is_read_from_its_definition(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = ET.parse(ROOT / "config/pipeline.template.xml").getroot()
-            catalog = root.find("preprocessing/relevantParameters")
-            death = self.parameter(catalog, "post", "recorded_death_days")
+            catalog = root.find("preprocessing/parameters")
+            death = self.parameter(catalog, "postOperative", "recorded_death_days")
             death.find("entry[@name='outcome_criteria']/object/entry[@name='failure']/object/entry[@name='value']/number").text = "2"
             self.keep_parameters(catalog, {"recorded_death_days"})
             path = Path(temporary) / "config" / "pipeline.xml"
@@ -76,9 +78,9 @@ class PhaseSelectorTests(unittest.TestCase):
     def test_post_class_nonempty_failure_only_uses_selected_fields_after_start(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = ET.parse(ROOT / "config/pipeline.template.xml").getroot()
-            catalog = root.find("preprocessing/relevantParameters")
+            catalog = root.find("preprocessing/parameters")
             self.keep_parameters(catalog, {"postop_urine_72h"})
-            catalog.find("post/class[@name='epic.FLUIDS_OUT']").set("failure", "nonempty")
+            catalog.find("postOperative/class[@name='epic.FLUIDS_OUT']").set("failure", "nonempty")
             config = Path(temporary) / "config" / "pipeline.xml"
             config.parent.mkdir()
             ET.ElementTree(root).write(config, encoding="utf-8", xml_declaration=True)
@@ -114,7 +116,7 @@ class PhaseSelectorTests(unittest.TestCase):
             })
             source = root / "synthetic.csv"
             source.write_text("unixtime,event,synthetic.oxygen,operation result\n100,,5,\n200,start surgery,10,\n300,,20,severe problems\n", encoding="utf-8")
-            from src.logger import Logger
+            from src.logging.logger import Logger
             with Logger(log_root=root / "logs") as logger:
                 analyze_inputs([source], root / "results", mapping, logger, generate_plots=False)
             with (root / "results/duringoperative_measurements.csv").open(newline="", encoding="utf-8") as stream:
@@ -127,10 +129,10 @@ class PhaseSelectorTests(unittest.TestCase):
     def test_during_phase_definition_loads_for_header_reports(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = ET.parse(ROOT / "config/pipeline.template.xml").getroot()
-            catalog = root.find("preprocessing/relevantParameters")
-            during_parameter = deepcopy(self.parameter(catalog, "pre", "age"))
+            catalog = root.find("preprocessing/parameters")
+            during_parameter = deepcopy(self.parameter(catalog, "preOperative", "age"))
             during_parameter.set("id", "during_age")
-            catalog.find("during").append(during_parameter)
+            catalog.find("duringOperative").append(during_parameter)
             self.keep_parameters(catalog, {"during_age"})
             path = Path(temporary) / "config" / "pipeline.xml"
             path.parent.mkdir()
@@ -143,11 +145,11 @@ class PhaseSelectorTests(unittest.TestCase):
             root = ET.parse(ROOT / "config/pipeline.template.xml").getroot()
             root.find("preprocessing/run").text = "true"
             root.find("preprocessing/csvHeaderDescriptions/run").text = "true"
-            root.find("preprocessing/inputs/path").text = "data/patients"
-            catalog = root.find("preprocessing/relevantParameters")
-            during_parameter = deepcopy(self.parameter(catalog, "pre", "age"))
+            root.find("preprocessing/inputDirectory").text = "data/patients"
+            catalog = root.find("preprocessing/parameters")
+            during_parameter = deepcopy(self.parameter(catalog, "preOperative", "age"))
             during_parameter.set("id", "during_age")
-            catalog.find("during").append(during_parameter)
+            catalog.find("duringOperative").append(during_parameter)
             path = project / "config/pipeline.xml"
             path.parent.mkdir()
             ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
@@ -178,7 +180,7 @@ class PhaseSelectorTests(unittest.TestCase):
             root = ET.parse(ROOT / "config/pipeline.template.xml").getroot()
             preprocessing = root.find("preprocessing")
             preprocessing.find("run").text = "true"
-            preprocessing.find("inputs/path").text = "data/patients"
+            preprocessing.find("inputDirectory").text = "data/patients"
             preprocessing.find("outputDirectory").text = "results"
             plotting = preprocessing.find("plotting")
             plotting.find("run").text = "true"
@@ -219,12 +221,12 @@ class PhaseSelectorTests(unittest.TestCase):
             root = ET.parse(ROOT / "config/pipeline.template.xml").getroot()
             preprocessing = root.find("preprocessing")
             preprocessing.find("run").text = "true"
-            preprocessing.find("inputs/path").text = "data/patients"
+            preprocessing.find("inputDirectory").text = "data/patients"
             preprocessing.find("outputDirectory").text = "results"
             preprocessing.find("plotting/run").text = "false"
             preprocessing.find("plotting/distributions").text = "false"
-            settings = preprocessing.find("relevantParameters/settings")
-            settings.find("entry[@name='export_time_series']/boolean").text = "true"
+            settings = preprocessing.find("parameters/settings")
+            settings.find("exportTimeSeries").text = "true"
             time_series = preprocessing.find("plotting/timeSeries")
             if time_series is None:
                 time_series = ET.SubElement(preprocessing.find("plotting"), "timeSeries")
@@ -291,7 +293,7 @@ class PhaseSelectorTests(unittest.TestCase):
     def test_empty_phase_selections_still_allow_header_only_inventory(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = ET.parse(ROOT / "config/pipeline.template.xml").getroot()
-            catalog = root.find("preprocessing/relevantParameters")
+            catalog = root.find("preprocessing/parameters")
             self.empty_phases(catalog)
             path = Path(temporary) / "config" / "pipeline.xml"
             path.parent.mkdir()
@@ -302,7 +304,7 @@ class PhaseSelectorTests(unittest.TestCase):
     def test_shared_settings_cannot_redefine_parameter_catalog(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = ET.parse(ROOT / "config/pipeline.template.xml").getroot()
-            settings = root.find("preprocessing/relevantParameters/settings")
+            settings = root.find("preprocessing/parameters/settings")
             ET.SubElement(ET.SubElement(settings, "entry", {"name": "parameters"}), "array")
             path = Path(temporary) / "config/pipeline.xml"
             path.parent.mkdir()
@@ -313,8 +315,8 @@ class PhaseSelectorTests(unittest.TestCase):
     def test_class_group_rejects_unrelated_parameter_fields(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = ET.parse(ROOT / "config/pipeline.template.xml").getroot()
-            catalog = root.find("preprocessing/relevantParameters")
-            age = self.parameter(catalog, "pre", "age")
+            catalog = root.find("preprocessing/parameters")
+            age = self.parameter(catalog, "preOperative", "age")
             age.find("entry[@name='source_fields']/array/item/string").text = "epic.LAB.age"
             path = Path(temporary) / "config/pipeline.xml"
             path.parent.mkdir()
@@ -325,8 +327,8 @@ class PhaseSelectorTests(unittest.TestCase):
     def test_null_post_measurement_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = ET.parse(ROOT / "config/pipeline.template.xml").getroot()
-            catalog = root.find("preprocessing/relevantParameters")
-            parameter = self.parameter(catalog, "post", "recorded_death_days")
+            catalog = root.find("preprocessing/parameters")
+            parameter = self.parameter(catalog, "postOperative", "recorded_death_days")
             parameter.attrib.pop("measurementOrder")
             measurement = parameter.find("entry[@name='measurement']")
             measurement.remove(measurement[0])
@@ -340,8 +342,8 @@ class PhaseSelectorTests(unittest.TestCase):
     def test_duplicate_parameter_ids_are_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = ET.parse(ROOT / "config/pipeline.template.xml").getroot()
-            catalog = root.find("preprocessing/relevantParameters")
-            self.parameter(catalog, "post", "ventilation_duration").set("id", "age")
+            catalog = root.find("preprocessing/parameters")
+            self.parameter(catalog, "postOperative", "ventilation_duration").set("id", "age")
             path = Path(temporary) / "config/pipeline.xml"
             path.parent.mkdir()
             ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
@@ -351,21 +353,21 @@ class PhaseSelectorTests(unittest.TestCase):
     def test_embedded_map_requires_all_three_phase_sections(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = ET.parse(ROOT / "config/pipeline.template.xml").getroot()
-            catalog = root.find("preprocessing/relevantParameters")
-            for tag in ("pre", "during", "post"):
+            catalog = root.find("preprocessing/parameters")
+            for tag in ("preOperative", "duringOperative", "postOperative"):
                 catalog.remove(catalog.find(tag))
             path = Path(temporary) / "config" / "pipeline.xml"
             path.parent.mkdir()
             ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
-            with self.assertRaisesRegex(ValueError, "pre, during, and post"):
+            with self.assertRaisesRegex(ValueError, "preOperative, duringOperative, and postOperative"):
                 load_pipeline_config(path)
 
     @unittest.skipUnless(shutil.which("xmllint"), "xmllint is not installed")
     def test_schema_accepts_phase_sections_and_rejects_nonpost_failure(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = ET.parse(ROOT / "config/pipeline.template.xml").getroot()
-            catalog = root.find("preprocessing/relevantParameters")
-            pre = catalog.find("pre")
+            catalog = root.find("preprocessing/parameters")
+            pre = catalog.find("preOperative")
             self.keep_parameters(catalog, {"age", "recorded_death_days"})
             path = Path(temporary) / "synthetic.xml"
             ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)

@@ -13,7 +13,7 @@ This guide describes the pre-operative feature columns in `patient_vectors.csv`.
 | `bmi` | BMI | BMI | `epic.DEMOGRAPHICS.BMI` | Keep recorded pre-operative value; if missing, derive from weight and height using `config/pipeline.xml` units (default kg/cm; verify before clinical/research use). |
 | `asa` | ASA physical status | ASA-classificatie | `epic.DEMOGRAPHICS.ASA` | Recorded pre-operative status. |
 | `operation_diagnosis_proxy` | Operation / diagnosis proxy | Operatie-/diagnoseproxy | `epic.INGREEP.AN_PROC_NAME` | Extracted for review; omitted according to the model's XML `trainingValidation/omit` list. |
-| `baseline_creatinine` | Baseline creatinine | Creatinine vóór operatie | `epic.LAB.Kreatinine (umol/L)` | Latest valid pre-operative value; also used as the provisional AKI-screen baseline. |
+| `baseline_creatinine` | Baseline creatinine | Creatinine vóór operatie | `epic.LAB.Kreatinine (umol/L)` | Latest valid pre-operative measurement. |
 | `baseline_hemoglobin` | Baseline haemoglobin | Hemoglobine vóór operatie | `epic.LAB.Hb (mmol/L)`; `epic.LAB.poc Hb -ABL (mmol/L)` | Latest valid pre-operative value across the mapped alternatives. |
 
 ## BMI derivation
@@ -22,7 +22,7 @@ If recorded BMI is missing or nonnumeric, the processor uses `BMI = weight_kg / 
 
 ## How values are selected
 
-The pipeline uses each phase's `end_event` inside XML `<relevantParameters><settings><entry name="included_phases">`: the pre-operative event's `event_fields` and `phrases` find the earliest timestamped operation start as the cutoff; edit these values to match CSV headers and phrases. The during-operative item's `end_event` marks operation end and separates during/postoperative values (see the [XML guide](xml-pipeline-configuration.md#editable-operation-boundaries)). For time-varying parameters it takes the last valid reading strictly before that cutoff. The pre-operative `epic.DEMOGRAPHICS` class has `<timed>false</timed>`: its values are displayed without time in the dashboard, but dated records still obey the cutoff to prevent postoperative leakage. When no dated pre-operative value exists, an untimed value is retained only if the patient family has exactly one distinct non-missing value; conflicting values stay missing. Other time-varying laboratory features remain missing when the cutoff is unavailable.
+The pipeline uses each phase's `endEvent` inside XML `<parameters><preOperative>`, `<duringOperative>` or `<postOperative>`: the pre-operative event's `fields/field` and `phrases/phrase` find the earliest timestamped operation start as the cutoff; edit these values to match CSV headers and phrases. `duringOperative/endEvent` marks operation end and separates during/postoperative values (see the [XML guide](xml-pipeline-configuration.md#editable-operation-boundaries)). For time-varying parameters it takes the last valid reading strictly before that cutoff. The pre-operative `epic.DEMOGRAPHICS` class has `<timed>false</timed>`: its values are displayed without time in the dashboard, but dated records still obey the cutoff to prevent postoperative leakage. When no dated pre-operative value exists, an untimed value is retained only if the patient family has exactly one distinct non-missing value; conflicting values stay missing. Other time-varying laboratory features remain missing when the cutoff is unavailable.
 
 Numeric features retain the numeric component before the first `|` and discard trailing annotations; nonnumeric text in a numeric field is missing. Categorical fields remain categorical. Missing BMI is derived from weight and height when possible; other values are not imputed. Analysis does not scale vector values. The perceptron fits numeric standardization and categorical one-hot encoding using training rows only. Heatmap-only transformations do not alter `patient_vectors.csv`. During-operation and postoperative measurements are not input features.
 
@@ -34,4 +34,4 @@ Numeric features retain the numeric component before the first `|` and discard t
 - `perceptron_model.json`: model parameters and aggregate validation metrics, without patient rows or IDs.
 - `preoperative_heatmap.html`: visual overview; it does not modify the CSV values.
 
-Pre-operative definitions are maintained directly in `<relevantParameters><pre>` in `config/pipeline.xml`; shared derivation settings live in `<relevantParameters><settings>`.
+Pre-operative definitions are maintained directly in `<parameters><preOperative>` in `config/pipeline.xml`; shared derivation settings live in `<parameters><settings>`.

@@ -1,16 +1,20 @@
 import csv
 import json
+import shutil
 import tempfile
 import unittest
-from pathlib import Path
-import shutil
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 from src.cli import main
-from src.pipeline_config import load_pipeline_config, select_parameter_map
-from src.model_config import NovelDataConfig, PerceptronModelConfig, PlotConfig, TrainingValidationConfig
-from src.perceptron import predict_model, train_model
-from src.timeline_dashboard_view import DashboardLayout
+from src.models.novel_data.config import NovelDataConfig
+from src.models.perceptron.config import PerceptronModelConfig
+from src.models.perceptron.perceptron import predict_model, train_model
+from src.models.plotting.config import PlotConfig
+from src.models.training_validation.config import TrainingValidationConfig
+from src.pipeline.config import PipelineConfig, load_pipeline_config
+from src.preprocessing.parameters.settings import select_parameter_map
+from src.preprocessing.plotting.patient_timeline.timeline_dashboard_view import DashboardLayout
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -30,7 +34,7 @@ class PipelineConfigurationTests(unittest.TestCase):
         self.assertIsInstance(config["preprocessing"]["parameter_descriptions"]["run"], bool)
         self.assertIsInstance(config["preprocessing"]["csv_header_descriptions"]["run"], bool)
         self.assertEqual(config["preprocessing"]["csv_header_descriptions"]["inventory_output"], ROOT / "results" / "csv_headers.csv")
-        self.assertEqual(config["preprocessing"]["parameter_selection"]["phases"], [
+        self.assertEqual([phase.name for phase in PipelineConfig.load(ROOT / "config" / "pipeline.xml").preprocessing.parameters.phases], [
             "Pre-operative", "During-operative", "Post-operative"
         ])
         self.assertEqual(config["model"]["active_model"], "perceptron")
@@ -48,10 +52,10 @@ class PipelineConfigurationTests(unittest.TestCase):
         )
         self.assertEqual(config["logging"]["level"], "INFO")
         parameters = config["preprocessing"]["parameter_map"]["parameters"]
-        self.assertEqual(len(parameters), 21)
+        self.assertEqual(len(parameters), 20)
         self.assertEqual(sum(item["phase"] == "Pre-operative" for item in parameters), 9)
         self.assertEqual(sum(item["phase"] == "During-operative" for item in parameters), 1)
-        self.assertEqual(sum(item["phase"] == "Post-operative" for item in parameters), 11)
+        self.assertEqual(sum(item["phase"] == "Post-operative" for item in parameters), 10)
         self.assertEqual(config["preprocessing"]["parameter_map"]["included_phases"], [
             "Pre-operative", "During-operative", "Post-operative"
         ])
@@ -231,6 +235,7 @@ class PipelineConfigurationTests(unittest.TestCase):
                     project / "data" / "patients",
                     f"synthetic-{index}.csv",
                     postop_creatinine=creatinine,
+                    operation_result="severe problems" if index < 3 else "optimal",
                 )
 
             config_path = project / "config" / "pipeline.xml"
@@ -238,7 +243,7 @@ class PipelineConfigurationTests(unittest.TestCase):
             root = tree.getroot()
             root.find("logging/directory").text = "logs"
             root.find("preprocessing/run").text = "true"
-            root.find("preprocessing/inputs/path").text = "data/patients"
+            root.find("preprocessing/inputDirectory").text = "data/patients"
             root.find("preprocessing/outputDirectory").text = "results"
             root.find("preprocessing/parameterDescriptions/run").text = "true"
             root.find("preprocessing/parameterDescriptions/output").text = "results/parameter_reference.md"
@@ -256,8 +261,8 @@ class PipelineConfigurationTests(unittest.TestCase):
             ET.indent(root, space="  ")
             tree.write(config_path, encoding="utf-8", xml_declaration=True)
             self.assertEqual(
-                load_pipeline_config(config_path)["preprocessing"]["inputs"],
-                [(project / "data" / "patients").resolve()],
+                load_pipeline_config(config_path)["preprocessing"]["input_directory"],
+                (project / "data" / "patients").resolve(),
             )
 
             self.assertEqual(main(["run", "--config", str(config_path)]), 0)

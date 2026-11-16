@@ -8,10 +8,10 @@ from contextlib import redirect_stderr
 from pathlib import Path
 from unittest.mock import patch
 
-from src.parameter_map import load_parameter_map
-from src.plotly_output import write_plotly_html
-from src.time_series_plots import TimeSeriesPlotter
 from src.cli import main
+from src.plotlib.plotly_output import write_plotly_html
+from src.preprocessing.parameters.parameter_map import load_parameter_map
+from src.preprocessing.plotting.time_series.time_series_plots import TimeSeriesPlotter
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -56,7 +56,7 @@ class TimeSeriesPlotTests(unittest.TestCase):
 
     def test_dark_theme_applies_to_time_series_charts(self):
         with patch(
-            "src.time_series_plots.write_plotly_html",
+            "src.preprocessing.plotting.time_series.time_series_plots.write_plotly_html",
             wraps=write_plotly_html,
         ) as write_plot:
             TimeSeriesPlotter(self.mapping).generate(
@@ -88,7 +88,7 @@ class TimeSeriesPlotTests(unittest.TestCase):
             })
 
         with patch(
-            "src.time_series_plots.write_plotly_html",
+            "src.preprocessing.plotting.time_series.time_series_plots.write_plotly_html",
             wraps=write_plotly_html,
         ) as write_plot:
             result = TimeSeriesPlotter(self.mapping).generate(

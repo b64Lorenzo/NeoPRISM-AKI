@@ -6,7 +6,7 @@ from pathlib import Path
 
 import plotly.graph_objects as go
 
-from src.plotly_output import plotly_template, write_plotly_html
+from src.plotlib.plotly_output import plotly_template, write_plotly_html
 
 
 class PlotlyOutputTests(unittest.TestCase):
