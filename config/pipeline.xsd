@@ -23,7 +23,7 @@
     </xs:restriction>
   </xs:simpleType>
   <xs:simpleType name="PlotPhase">
-    <xs:annotation><xs:documentation>Phase filter used when generating parameter distribution plots.</xs:documentation></xs:annotation>
+    <xs:annotation><xs:documentation>Phase filter for distribution and patient-missingness plots.</xs:documentation></xs:annotation>
     <xs:restriction base="xs:string">
       <xs:enumeration value="all" />
       <xs:enumeration value="preoperative" />
@@ -106,7 +106,7 @@
     </xs:sequence>
   </xs:complexType>
   <xs:complexType name="IdListType">
-    <xs:annotation><xs:documentation>Zero or more parameter IDs, used for include, exclude, model omission, and time-series selection lists.</xs:documentation></xs:annotation>
+    <xs:annotation><xs:documentation>Zero or more parameter IDs, used for include, exclude, model omission, and plot selection lists.</xs:documentation></xs:annotation>
     <xs:sequence>
       <xs:element name="id" type="xs:string" minOccurs="0" maxOccurs="unbounded">
         <xs:annotation><xs:documentation>Stable parameter ID or pseudonymous patient ID used by the surrounding list setting.</xs:documentation></xs:annotation>
@@ -114,7 +114,7 @@
     </xs:sequence>
   </xs:complexType>
   <xs:complexType name="ClassNameListType">
-    <xs:annotation><xs:documentation>Zero or more XML class names used to filter time-series parameters.</xs:documentation></xs:annotation>
+    <xs:annotation><xs:documentation>Zero or more explicit XML class names used to filter plotted parameters.</xs:documentation></xs:annotation>
     <xs:sequence>
       <xs:element name="name" type="xs:string" minOccurs="0" maxOccurs="unbounded">
         <xs:annotation><xs:documentation>Exact class name from the parameter's XML class group.</xs:documentation></xs:annotation>
@@ -203,12 +203,39 @@
       </xs:element>
     </xs:sequence>
   </xs:complexType>
+  <xs:group name="PlotSelectionGroup">
+    <xs:annotation><xs:documentation>Intersect phase, parameter IDs and explicit XML class membership. Empty lists do not restrict the chosen phase.</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="phase" type="PlotPhase">
+        <xs:annotation><xs:documentation>all, preoperative, duringoperative, or postoperative.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="parameterIds" type="IdListType">
+        <xs:annotation><xs:documentation>Mapped parameter IDs to include; empty selects all eligible parameters.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="classNames" type="ClassNameListType">
+        <xs:annotation><xs:documentation>Exact XML class names to include; empty does not restrict classes. Only mapped parameters are selected.</xs:documentation></xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:group>
+  <xs:complexType name="DistributionPlotType">
+    <xs:annotation><xs:documentation>Patient-level parameter distributions with independent filters and histogram settings.</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="run" type="xs:boolean">
+        <xs:annotation><xs:documentation>Enable distributions when the parent plotting switch is enabled.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="bins" type="xs:positiveInteger">
+        <xs:annotation><xs:documentation>Positive number of histogram bins for numeric distributions.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:group ref="PlotSelectionGroup" />
+    </xs:sequence>
+  </xs:complexType>
   <xs:complexType name="PatientMissingnessPlotType">
-    <xs:annotation><xs:documentation>Controls the Plotly heatmap showing missing pre-operative features by pseudonymous patient.</xs:documentation></xs:annotation>
+    <xs:annotation><xs:documentation>Controls the Plotly heatmap showing missing selected parameters by pseudonymous patient.</xs:documentation></xs:annotation>
     <xs:sequence>
       <xs:element name="run" type="xs:boolean">
         <xs:annotation><xs:documentation>Whether the patient-by-feature missingness heatmap is generated when preprocessing plots are enabled.</xs:documentation></xs:annotation>
       </xs:element>
+      <xs:group ref="PlotSelectionGroup" />
       <xs:element name="output" type="xs:string">
         <xs:annotation><xs:documentation>Destination .html path for the interactive patient missingness heatmap.</xs:documentation></xs:annotation>
       </xs:element>
@@ -220,20 +247,14 @@
       <xs:element name="run" type="xs:boolean">
         <xs:annotation><xs:documentation>Whether preprocessing heatmaps are generated.</xs:documentation></xs:annotation>
       </xs:element>
-      <xs:element name="distributions" type="xs:boolean">
+      <xs:element name="distributions" type="DistributionPlotType">
         <xs:annotation><xs:documentation>Whether parameter distributions are generated in addition to enabled heatmaps.</xs:documentation></xs:annotation>
-      </xs:element>
-      <xs:element name="phase" type="PlotPhase">
-        <xs:annotation><xs:documentation>Distribution phase filter: all, preoperative, duringoperative, or postoperative.</xs:documentation></xs:annotation>
-      </xs:element>
-      <xs:element name="bins" type="xs:positiveInteger">
-        <xs:annotation><xs:documentation>Positive number of histogram bins for numeric distributions.</xs:documentation></xs:annotation>
       </xs:element>
       <xs:element name="theme" type="PlotTheme">
         <xs:annotation><xs:documentation>Light or dark Plotly theme applied to preprocessing heatmaps, distributions, time series, and the study dashboard.</xs:documentation></xs:annotation>
       </xs:element>
       <xs:element name="missingnessByPatient" type="PatientMissingnessPlotType">
-        <xs:annotation><xs:documentation>Configures the default interactive heatmap of missing pre-operative data by patient.</xs:documentation></xs:annotation>
+        <xs:annotation><xs:documentation>Configures the interactive heatmap of selected phase/parameter/class missingness by patient.</xs:documentation></xs:annotation>
       </xs:element>
       <xs:element name="timeSeries" type="TimeSeriesPlotType">
         <xs:annotation><xs:documentation>Optional XML-controlled time-series plotting stage that consumes the generated or existing time_series.csv.</xs:documentation></xs:annotation>

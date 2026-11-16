@@ -33,7 +33,7 @@ py -3 -m src.cli plot-time-series --input results/time_series.csv
 
 Same-directory numbered CSV parts are grouped into one patient family. `patient_vectors.csv` contains pre-operative inputs only; `patient_outcomes.csv` stores postoperative-derived labels separately. Training joins by `patient_id`. Labels are `-1` (failure), `+1` (success), or `NA` (unclassified); failure evidence takes precedence, and `NA` is excluded from training. Validation exports predictions without the true target. The perceptron is a hard classifier, not a calibrated probability estimator.
 
-Analysis also writes `postoperative_measurements.csv` for review. `duringoperative_measurements.csv` and phase-relative `time_series.csv` are optional. The checked-in `during_creatinine` mapping is illustrative; verify source availability, timing, and units. Heatmaps, a patient timeline, distributions, and time-series plots are configurable; see the guides below. Existing output files are not cleaned up between runs—use a fresh directory when needed. Logs are written to `logs/<UTC-run-id>/run.log` and mirrored to stderr.
+Analysis also writes `postoperative_measurements.csv` for review. `duringoperative_measurements.csv` and phase-relative `time_series.csv` are optional. The checked-in `during_creatinine` mapping is illustrative; verify source availability, timing, and units. Distribution and missingness plots have independent phase, parameter-ID, and mapped-class filters in XML; these filters affect plots only, not model inputs. Heatmaps, a patient timeline, distributions, and time-series plots are configurable; see the guides below. Existing output files are not cleaned up between runs—use a fresh directory when needed. Logs are written to `logs/<UTC-run-id>/run.log` and mirrored to stderr.
 
 All automated fixtures are synthetic; they do not establish clinical validity. Confirm field meanings, units, event boundaries, and outcome definitions with the data owner before cohort use.
 
@@ -50,4 +50,8 @@ All automated fixtures are synthetic; they do not establish clinical validity. C
 | Pipeline stages, settings, and migration | [XML pipeline configuration](docs/xml-pipeline-configuration.md) |
 | Packages and extension points | [Code structure](docs/code-structure.md) |
 
-On Windows, XML Notepad is an optional XML editor; installation and validation steps are in the [parameter-map guide](docs/parameter-map-xml.md). Original project code and documentation are MIT-licensed; course materials, datasets, and third-party content retain their own terms ([notices](THIRD_PARTY_NOTICES.md)). Code autocompletion is used; AI may help write tests and documentation. Authors remain responsible for review and validation.
+On Windows, XML Notepad is an optional XML editor; installation and validation steps are in the [parameter-map guide](docs/parameter-map-xml.md). Original project code and documentation are MIT-licensed; course materials, datasets, and third-party content retain their own terms ([notices](THIRD_PARTY_NOTICES.md)).
+
+## AI use notice
+
+Code autocompletion is used. AI may assist with writing tests and documentation. Authors are responsible for reviewing and validating all submitted work.

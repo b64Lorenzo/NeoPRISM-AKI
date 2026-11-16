@@ -11,11 +11,9 @@ from typing import Iterable
 from src.logging.logger import Logger, LogLevel
 from src.preprocessing.duringoperative.processor import DuringoperativeProcessor
 from src.preprocessing.parameters.parameter_map import load_parameter_map
-from src.preprocessing.plotting.heatmaps import (
-    sample_patients,
-    write_heatmap,
-    write_parameter_heatmap,
-)
+from src.preprocessing.plotting.heatmaps import write_parameter_heatmap
+from src.preprocessing.plotting.missingness_by_patient.plot import write_patient_missingness
+from src.preprocessing.plotting.selection import PlotSelection
 from src.preprocessing.postoperative.processor import PostoperativeProcessor
 from src.preprocessing.preoperative.processor import PreoperativeProcessor
 from src.preprocessing.time_series.processor import TimeSeriesProcessor
@@ -40,6 +38,7 @@ def analyze_inputs(
     generate_patient_missingness: bool | None = None,
     patient_missingness_output: str | Path | None = None,
     plot_theme: str = "light",
+    patient_missingness_selection: Mapping[str, object] | None = None,
 ) -> list[dict]:
     """Write a feature-only vector CSV and a separate outcome-label CSV."""
     output = Path(output_dir)
@@ -52,6 +51,12 @@ def analyze_inputs(
         from src.preprocessing.parameters.settings import select_parameter_map
 
         parameter_map = select_parameter_map(parameter_map, **parameter_selection)
+    if generate_patient_missingness is None:
+        generate_patient_missingness = generate_plots
+    missingness_parameters = []
+    if generate_patient_missingness:
+        selection = {"phase": "preoperative", "parameter_ids": [], "class_names": [], **(patient_missingness_selection or {})}
+        missingness_parameters = PlotSelection(**selection).select(parameter_map)
     output.mkdir(parents=True, exist_ok=True)
     files = discover_csv_files(inputs, output)
     if not files:
@@ -168,31 +173,11 @@ def analyze_inputs(
             theme=plot_theme,
         )
 
-    if generate_patient_missingness is None:
-        generate_patient_missingness = generate_plots
     if generate_patient_missingness:
-        sample = sample_patients(patients)
-        missing_matrix = [
-            [
-                1.0 if feature_id in patient["missing_features"] else 0.0
-                for feature_id in feature_ids
-            ]
-            for patient in sample
-        ]
-        write_heatmap(
-            Path(patient_missingness_output)
-            if patient_missingness_output is not None
+        write_patient_missingness(
+            Path(patient_missingness_output) if patient_missingness_output is not None
             else output / "preoperative_missingness_heatmap.html",
-            missing_matrix,
-            [patient["patient_id"] for patient in sample],
-            feature_ids,
-            "Pre-operative feature missingness by patient",
-            "Missing (1) / present (0)",
-            row_axis_label="Patient pseudonym",
-            colorscale=[[0, "#2f855a"], [1, "#c53030"]],
-            colorbar_tickvals=[0, 1],
-            colorbar_ticktext=["Present", "Missing"],
-            theme=plot_theme,
+            patients, missingness_parameters, theme=plot_theme,
         )
 
     failures = sum(patient["target_status"] == "failure" for patient in patients)

@@ -33,7 +33,7 @@ Postoperative measurement aggregation and optional time windows are configured o
 
 The optional patient timeline shows operation-relative hours, keeps untimed demographics off the timeline, and omits absolute dates. Its searchable series selector supports individual or all traces; events after the configured stay endpoint appear in a follow-up lane. Numeric traces are independently scaled for display, with original values on hover. Summary panels include operation boundaries/duration, counts, timing gaps, configured ICU and hospital durations, and death status/recorded days when available. Study-plot embeds and patient comparisons are configurable. Source event vocabulary, ICU date fields, and timezone assumptions require confirmation. The HTML contains patient-level values; keep it and its local Plotly bundle in approved storage.
 
-Feature heatmaps use a deterministic sample of up to 500 patients. Numeric columns are min–max scaled independently (`0` to `1`; constant columns to `0.5`); categorical values are one-hot encoded for display, and missing/unresolved cells are gray. These transformations do not change CSVs. The missingness map uses `1` for missing and `0` for present.
+Feature heatmaps use a deterministic sample of up to 500 patients. Numeric columns are min–max scaled independently (`0` to `1`; constant columns to `0.5`); categorical values are one-hot encoded for display, and missing/unresolved cells are gray. These transformations do not change CSVs. The patient-missingness map uses `1` for missing and `0` for present; it defaults to pre-operative features, but XML can independently select phase, parameter IDs, and mapped classes. A recorded zero is present. Plot filters change only the visualization, not extracted features or model inputs; see [plot settings](xml-pipeline-configuration.md#distribution-and-missingness-plot-selection).
 
 ## Output files
 
@@ -46,6 +46,6 @@ Feature heatmaps use a deterministic sample of up to 500 patients. Numeric colum
 | `time_series.csv` | Optional phase-relative numeric readings; no dates; never a model input. |
 | `training_set.csv` | Training features and true target. |
 | `validation_set.csv` | Validation features and prediction; no true target. |
-| HTML and report files | `preoperative_heatmap.html`, `preoperative_missingness_heatmap.html`, `postoperative_heatmap.html`, `patient_timeline_dashboard.html`, and `extraction_report.md`; distributions and time-series plots are optional. |
+| HTML and report files | `preoperative_heatmap.html`, `preoperative_missingness_heatmap.html` (default, output configurable), `postoperative_heatmap.html`, `patient_timeline_dashboard.html`, and `extraction_report.md`; distributions and time-series plots are optional. |
 
 Existing files in the output directory are not removed between runs; use a fresh directory when you need a clean result. Tests use synthetic fixtures only and do not establish clinical validity. Keep cohort CSVs, reports, plots, and logs in approved storage and out of version control.

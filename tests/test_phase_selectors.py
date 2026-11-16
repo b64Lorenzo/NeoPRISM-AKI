@@ -169,7 +169,7 @@ class PhaseSelectorTests(unittest.TestCase):
             self.assertIn("| epic.DEMOGRAPHICS | 1 |", during)
             self.assertTrue((project / "results/patient_vectors.csv").exists())
             root.find("preprocessing/plotting/run").text = "true"
-            root.find("preprocessing/plotting/distributions").text = "true"
+            root.find("preprocessing/plotting/distributions/run").text = "true"
             ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
             self.assertIn("preprocessing plots", run_pipeline(path))
             self.assertTrue((project / "results/parameter_distributions/duringoperative_during_age.html").is_file())
@@ -224,7 +224,7 @@ class PhaseSelectorTests(unittest.TestCase):
             preprocessing.find("inputDirectory").text = "data/patients"
             preprocessing.find("outputDirectory").text = "results"
             preprocessing.find("plotting/run").text = "false"
-            preprocessing.find("plotting/distributions").text = "false"
+            preprocessing.find("plotting/distributions/run").text = "false"
             settings = preprocessing.find("parameters/settings")
             settings.find("exportTimeSeries").text = "true"
             time_series = preprocessing.find("plotting/timeSeries")

@@ -905,12 +905,20 @@
     </csvHeaderDescriptions>
     <plotting>
       <run>true</run>
-      <distributions>true</distributions>
-      <phase>all</phase>
-      <bins>20</bins>
+      <!-- Empty parameter/class lists select all mapped items in the chosen phase. -->
+      <distributions>
+        <run>true</run>
+        <bins>20</bins>
+        <phase>all</phase>
+        <parameterIds />
+        <classNames />
+      </distributions>
       <theme>dark</theme>
       <missingnessByPatient>
         <run>true</run>
+        <phase>preoperative</phase>
+        <parameterIds />
+        <classNames />
         <output>results/preoperative_missingness_heatmap.html</output>
       </missingnessByPatient>
       <timeSeries>

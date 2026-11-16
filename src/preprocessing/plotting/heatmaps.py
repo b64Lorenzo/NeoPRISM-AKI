@@ -54,7 +54,7 @@ def write_heatmap(
     colorbar_label: str,
     row_axis_label: str = "Patient pseudonym",
     *,
-    colorscale="Viridis",
+    colorscale: str | Sequence[Sequence[float | str]] = "Viridis",
     colorbar_tickvals: Sequence[float] = (),
     colorbar_ticktext: Sequence[str] = (),
     theme: str = "light",

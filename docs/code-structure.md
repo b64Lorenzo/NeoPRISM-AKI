@@ -23,8 +23,9 @@ src/
     plotting/
       config.py                  # Common plot options and typed child settings
       heatmaps.py
-      parameter_distributions.py
-      missingness_by_patient/    # Independent plot output settings
+      selection.py               # Shared phase/parameter/class selection
+      distributions/             # Own settings and patient-level distribution plots
+      missingness_by_patient/    # Own selection, destination and missingness renderer
       time_series/               # Plot filters and time-series plotting
       patient_timeline/          # Dashboard settings, generation and HTML view
         layout/                  # Typed chart/panel dimensions
@@ -41,6 +42,8 @@ src/
   plotlib/                       # Shared Plotly HTML output only
   utils/                         # XML values/projection, CSV reading and aggregate table IO
 ```
+
+`plotting/selection.py` applies visual-only phase, parameter-ID, and class filters. Distribution and missingness plots own independent XML settings; these filters do not change extraction, outcomes, or model inputs.
 
 ## Runtime flow
 
@@ -61,9 +64,9 @@ flowchart TD
     headers -->|yes| inventory["Inventory CSV headers only"]
     headers -->|no| preprocess{"preprocessing.run?"}
     inventory --> preprocess
-    preprocess -->|yes| analyze["analyze_inputs(); generate heatmaps when plotting is enabled"]
+    preprocess -->|yes| analyze["analyze_inputs(); generate configured feature and missingness heatmaps"]
     preprocess -->|no| existing["Use existing output files for later enabled stages"]
-    analyze --> distributions{"plotting.run and distributions enabled?"}
+    analyze --> distributions{"plotting.run and distributions.run?"}
     existing --> distributions
     distributions -->|yes| distributionPlots["Generate parameter-distribution plots"]
     distributions -->|no| timePlots{"timeSeries.run?"}

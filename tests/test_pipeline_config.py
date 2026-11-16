@@ -248,7 +248,7 @@ class PipelineConfigurationTests(unittest.TestCase):
             root.find("preprocessing/parameterDescriptions/run").text = "true"
             root.find("preprocessing/parameterDescriptions/output").text = "results/parameter_reference.md"
             root.find("preprocessing/plotting/run").text = "false"
-            root.find("preprocessing/plotting/distributions").text = "false"
+            root.find("preprocessing/plotting/distributions/run").text = "false"
             root.find("model/perceptron/run").text = "true"
             root.find("model/perceptron/mode").text = "train-validation"
             root.find("model/perceptron/trainingValidation/trainingSet").text = "results/training_set.csv"

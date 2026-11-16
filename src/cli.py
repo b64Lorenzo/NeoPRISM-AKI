@@ -14,7 +14,7 @@ from src.pipeline.config import load_pipeline_config
 from src.pipeline.runner import run_pipeline
 from src.preprocessing.parameters.parameter_map import load_parameter_map
 from src.preprocessing.patient_pipeline import analyze_inputs
-from src.preprocessing.plotting.parameter_distributions import generate_parameter_distributions
+from src.preprocessing.plotting.distributions.plots import generate_parameter_distributions
 from src.preprocessing.plotting.time_series.time_series_plots import TimeSeriesPlotter
 
 ROOT = Path(__file__).resolve().parents[1]

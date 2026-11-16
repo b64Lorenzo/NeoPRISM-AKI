@@ -12,11 +12,11 @@ from src.logging.logger import Logger
 from src.plotlib.plotly_output import write_plotly_html
 from src.preprocessing.parameters.parameter_map import load_parameter_map, write_parameter_map
 from src.preprocessing.patient_pipeline import analyze_inputs
-from src.preprocessing.plotting.heatmaps import build_parameter_matrix, write_heatmap
-from src.preprocessing.plotting.parameter_distributions import (
+from src.preprocessing.plotting.distributions.plots import (
     _plot_distribution,
     generate_parameter_distributions,
 )
+from src.preprocessing.plotting.heatmaps import build_parameter_matrix, write_heatmap
 from src.preprocessing.postoperative.processor import PostoperativeProcessor
 from src.preprocessing.preoperative.processor import PreoperativeProcessor
 
@@ -214,7 +214,7 @@ class PatientVectorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             with patch(
-                "src.preprocessing.plotting.parameter_distributions.write_plotly_html",
+                "src.preprocessing.plotting.distributions.plots.write_plotly_html",
                 wraps=write_plotly_html,
             ) as distribution_writer:
                 _plot_distribution(

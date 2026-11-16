@@ -108,9 +108,30 @@ The active discharge phrases and ICU datetime fields/timezone are candidates req
 
 Reports can contain identifying filenames even though no patient rows are read. Keep them local, and use a text-aware CSV viewer rather than a spreadsheet that might execute untrusted header formulas. Logs contain aggregate counts only.
 
-### Patient-by-feature missingness heatmap
+### Distribution and missingness plot selection
 
-Enable both `plotting/run` and `plotting/missingnessByPatient/run`. The configured output is an interactive patient-by-pre-operative-feature map (`1` missing, `0` present), sampled deterministically to at most 500 patients. Heatmap scaling/encoding is visual only; exported feature values are unchanged. `plotting/distributions` additionally enables distributions; `phase` and positive `bins` control those plots. `theme` accepts `dark` or `light` across Plotly outputs.
+Both `distributions` and `missingnessByPatient` have their own `run`, `phase`, `parameterIds/id` and `classNames/name` settings. `phase` accepts `all`, `preoperative`, `duringoperative` or `postoperative`; populated filters intersect, and empty lists mean all eligible mapped parameters in the chosen phase. Classes expand only their explicitly mapped XML members, not arbitrary raw CSV fields. Unknown names and empty explicit intersections are rejected. Plot selections never change extraction, outcome criteria or model inputs.
+
+```xml
+<distributions>
+  <run>true</run>
+  <bins>20</bins>
+  <phase>all</phase>
+  <parameterIds />
+  <classNames />
+</distributions>
+<missingnessByPatient>
+  <run>true</run>
+  <phase>duringoperative</phase>
+  <parameterIds />
+  <classNames><name>epic.LAB</name></classNames>
+  <output>results/selected_missingness.html</output>
+</missingnessByPatient>
+```
+
+To migrate an earlier config, replace the boolean `<distributions>` and parent-level `<phase>`/`<bins>` with the nested distribution settings above. Add `<phase>preoperative</phase>`, `<parameterIds />` and `<classNames />` under an existing `missingnessByPatient` element; keep its current `run` and `output` values.
+
+Enable `plotting/run` for these children. Distributions use a positive `bins` count and patient-level CSV tables; they write plots under `parameter_distributions/` plus `parameter_distribution_summary.csv` and `parameter_distribution_categories.csv`. Missingness also requires preprocessing: it writes to its configured `output` (default `results/preoperative_missingness_heatmap.html`) and uses the selected phases' extracted observations (`1` missing, `0` present), sampled deterministically to at most 500 patients. Valid zero values are present, not missing. By default, distributions include all eligible mapped parameters and missingness includes pre-operative features. `theme` accepts `dark` or `light` across Plotly outputs.
 
 ### Phase-relative time-series export
 

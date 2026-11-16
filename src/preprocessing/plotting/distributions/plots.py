@@ -6,12 +6,13 @@ import csv
 import re
 import statistics
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from src.plotlib.plotly_output import plotly_template, write_plotly_html
 from src.preprocessing.parameters.parameter_map import load_parameter_map
 from src.preprocessing.parameters.settings import select_parameter_map
+from src.preprocessing.plotting.selection import PlotSelection
 from src.utils.csv_utils import number_component
 
 
@@ -134,6 +135,8 @@ def generate_parameter_distributions(
     *,
     bins: int = 20,
     phase: str = "all",
+    parameter_ids: Iterable[str] = (),
+    class_names: Iterable[str] = (),
     theme: str = "light",
     parameter_selection: Mapping[str, object] | None = None,
 ) -> int:
@@ -148,6 +151,7 @@ def generate_parameter_distributions(
     )
     if parameter_selection is not None:
         config = select_parameter_map(config, **parameter_selection)
+    parameters = PlotSelection(phase.casefold(), list(parameter_ids), list(class_names)).select(config)
     postoperative_specs = config.get("postoperative_measurements", [])
     preoperative_rows = _read_rows(output / "patient_vectors.csv")
     duringoperative_rows = _read_rows(output / "duringoperative_measurements.csv")
@@ -160,16 +164,6 @@ def generate_parameter_distributions(
 
     summary_rows: list[dict[str, str | int]] = []
     category_rows: list[dict[str, str | int]] = []
-    phase_names = {"all": None, "preoperative": "Pre-operative", "duringoperative": "During-operative", "postoperative": "Post-operative"}
-    try:
-        phase_name = phase_names[phase.casefold()]
-    except KeyError as error:
-        raise ValueError("phase must be all, preoperative, duringoperative, or postoperative") from error
-    parameters = [
-        parameter for parameter in config.get("parameters", [])
-        if parameter.get("phase") in {"Pre-operative", "During-operative", "Post-operative"}
-        and (phase_name is None or parameter.get("phase") == phase_name)
-    ]
     for parameter in parameters:
         parameter_id = str(parameter["id"])
         parameter_phase = str(parameter["phase"])

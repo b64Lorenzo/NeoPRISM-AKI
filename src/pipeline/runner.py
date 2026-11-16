@@ -10,7 +10,7 @@ from src.pipeline.config import PipelineConfig
 from src.preprocessing.csv_header_descriptions.inventory import write_csv_header_descriptions
 from src.preprocessing.parameter_descriptions.reference import write_parameter_reference
 from src.preprocessing.patient_pipeline import analyze_inputs
-from src.preprocessing.plotting.parameter_distributions import generate_parameter_distributions
+from src.preprocessing.plotting.distributions.plots import generate_parameter_distributions
 from src.preprocessing.plotting.patient_timeline.patient_timeline import PatientTimelineDashboard
 from src.preprocessing.plotting.time_series.time_series_plots import TimeSeriesPlotter
 
@@ -81,15 +81,21 @@ def run_pipeline(config_path: str | Path) -> str:
                     plots["run"] and plots["missingness_by_patient"]["run"]
                 ),
                 patient_missingness_output=plots["missingness_by_patient"]["output"],
+                patient_missingness_selection={
+                    key: plots["missingness_by_patient"][key]
+                    for key in ("phase", "parameter_ids", "class_names")
+                },
                 plot_theme=plots["theme"],
             )
             completed.append("preprocessing")
-        if plots["run"] and plots["distributions"]:
+        if plots["run"] and plots["distributions"]["run"]:
             count = generate_parameter_distributions(
                 preprocessing["output_directory"],
                 selected_map,
-                bins=plots["bins"],
-                phase=plots["phase"],
+                bins=plots["distributions"]["bins"],
+                phase=plots["distributions"]["phase"],
+                parameter_ids=plots["distributions"]["parameter_ids"],
+                class_names=plots["distributions"]["class_names"],
                 theme=plots["theme"],
             )
             logger.write(LogLevel.INFO, "plotting", f"distribution plots generated; parameters={count}")
