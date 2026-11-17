@@ -3,11 +3,10 @@ import io
 import math
 import tempfile
 import unittest
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import redirect_stderr
 from pathlib import Path
 from unittest.mock import patch
 
-from src.cli import main
 from src.logging.logger import Logger
 from src.plotlib.plotly_output import write_plotly_html
 from src.preprocessing.parameters.parameter_map import load_parameter_map, write_parameter_map
@@ -570,66 +569,6 @@ class PatientVectorTests(unittest.TestCase):
             ) as stream:
                 patient = next(csv.DictReader(stream))
             self.assertEqual(patient["target"], "1")
-
-    def test_cli_runs_and_logs_without_patient_filenames(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            self.make_patient(root, "private-name.csv", postop_creatinine="100")
-            stdout = io.StringIO()
-            stderr = io.StringIO()
-            with redirect_stdout(stdout), redirect_stderr(stderr):
-                result = main(
-                    [
-                        "analyze",
-                        str(root),
-                        "--output",
-                        str(root / "results"),
-                        "--log-dir",
-                        str(root / "logs"),
-                    ]
-                )
-            self.assertEqual(result, 0)
-            self.assertIn("1 patient(s) analyzed", stdout.getvalue())
-            self.assertNotIn("one patient per file", stdout.getvalue())
-            log = next((root / "logs").glob("*/run.log")).read_text(encoding="utf-8")
-            self.assertIn("analysis completed", log)
-            self.assertNotIn("private-name.csv", log)
-
-    def test_distributions_command_generates_per_parameter_plots_and_summary(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            self.make_patient(
-                root, "patient-a.csv", postop_creatinine="100", operation_result="severe problems"
-            )
-            self.make_patient(root, "patient-b.csv", postop_creatinine="45")
-            stdout = io.StringIO()
-            with redirect_stdout(stdout), redirect_stderr(io.StringIO()):
-                result = main(
-                    [
-                        "distributions",
-                        str(root),
-                        "--output",
-                        str(root / "results"),
-                        "--log-dir",
-                        str(root / "logs"),
-                    ]
-                )
-            self.assertEqual(result, 0)
-            plots = root / "results" / "parameter_distributions"
-            self.assertTrue((plots / "preoperative_age.html").is_file())
-            self.assertTrue((plots / "preoperative_operation_diagnosis_proxy.html").is_file())
-            self.assertTrue((plots / "postoperative_postop_creatinine_72h.html").is_file())
-            summary = (root / "results" / "parameter_distribution_summary.csv").read_text(
-                encoding="utf-8"
-            )
-            self.assertIn(
-                "operation_diagnosis_proxy,Operation / diagnosis proxy,Pre-operative,categorical,2,2",
-                summary,
-            )
-            self.assertIn(
-                "postop_creatinine_72h,Creatinine first 72 h,Post-operative,numeric,2,2", summary
-            )
-            self.assertIn("distribution", stdout.getvalue().lower())
 
     def test_heatmap_matrix_keeps_all_missing_configured_parameters(self):
         patients = [

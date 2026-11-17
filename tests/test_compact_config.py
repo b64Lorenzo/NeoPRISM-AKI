@@ -78,6 +78,14 @@ class CompactConfigurationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             project = Path(temporary)
             root = ET.parse(ROOT / "config" / "pipeline.template.xml").getroot()
+            input_directory = project / "data" / "patients"
+            input_directory.mkdir(parents=True)
+            (input_directory / "synthetic.csv").write_text(
+                "unixtime,epic.EVENTS.EVENT,epic.DEMOGRAPHICS.age\n"
+                "100,,8\n200,Start surgery,\n300,Stop anesthesie,\n",
+                encoding="utf-8",
+            )
+            _section(root, "preprocessing/inputDirectory").text = "data/patients"
             parameters = _section(root, "preprocessing/parameters")
             _section(parameters, "settings/selectionEnabled").text = "true"
             ET.SubElement(
@@ -86,17 +94,18 @@ class CompactConfigurationTests(unittest.TestCase):
             for tag in ("duringOperative", "postOperative"):
                 _section(parameters, tag).set("selected", "false")
             _section(root, "preprocessing/parameterDescriptions/run").text = "true"
+            _section(root, "preprocessing/run").text = "true"
             _section(
                 root, "preprocessing/parameterDescriptions/output"
             ).text = "results/reference.md"
             path = project / "config" / "pipeline.xml"
             path.parent.mkdir()
             ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
-            self.assertEqual(run_pipeline(path), "parameter reference")
+            self.assertEqual(run_pipeline(path), "parameter reference, preprocessing")
             reference = (project / "results/reference.md").read_text(encoding="utf-8")
             self.assertIn("| age |", reference)
             self.assertNotIn("| sex |", reference)
-            self.assertFalse((project / "results/patient_vectors.csv").exists())
+            self.assertTrue((project / "results/patient_vectors.csv").exists())
 
     def test_phase_filters_reject_cross_phase_ids_overlap_and_no_selected_phase(self):
         from dataclasses import replace

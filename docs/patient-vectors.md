@@ -1,15 +1,16 @@
 # Patient-vector workflow and artifacts
 
-The CLI creates one feature vector and one outcome per patient filename family. Pre-operative features become model inputs; postoperative evidence supplies labels and is kept separate. The perceptron joins the files by `patient_id`, never by row order. See the [training guide](perceptron-training.md) for fitting and validation.
+The XML-configured pipeline creates one feature vector and one outcome per patient filename family. Pre-operative features become model inputs; postoperative evidence supplies labels and is kept separate. The perceptron joins the files by `patient_id`, never by row order. See the [training guide](perceptron-training.md) for fitting and validation.
 
 ## Run
 
+Set `preprocessing/inputDirectory`, `preprocessing/outputDirectory`, and the relevant stage switches in `config/pipeline.xml`, then run the pipeline:
+
 ```powershell
-py -3 -m src.cli analyze "C:\path\to\patient-csvs" --output "C:\path\to\results"
-py -3 -m src.cli distributions "C:\path\to\patient-csvs" --output "C:\path\to\results" --phase all --bins 20
+py -3 -m src.cli run --config config/pipeline.xml
 ```
 
-Directories are searched recursively. Use a folder containing only the intended cohort. `--outcome-column` selects or prioritizes a direct outcome column; `--success-values` and `--failure-values` override its exact category lists. Confirm the cohort coding before overriding the XML rules.
+Directories are searched recursively. Use a folder containing only the intended cohort. Direct outcome categories are configured under `preprocessing/parameters/settings/outcomeRules`, and parameter-specific criteria are configured on their owning XML parameters; confirm the cohort coding before changing those rules. The CLI has no separate analysis or distribution commands.
 
 ## Patient families and privacy
 

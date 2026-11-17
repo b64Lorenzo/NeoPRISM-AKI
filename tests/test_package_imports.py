@@ -1,12 +1,10 @@
 """Import and real CLI smoke checks without reading cohort inputs."""
 
 import importlib
-import io
 import pkgutil
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
-from contextlib import redirect_stdout
 from pathlib import Path
 
 import src
@@ -21,7 +19,13 @@ class PackageImportTests(unittest.TestCase):
             with self.subTest(module=module.name):
                 importlib.import_module(module.name)
 
-    def test_cli_run_reports_a_disabled_pipeline_without_an_unbound_logger(self):
+    def test_cli_help_lists_only_run_subcommand(self):
+        from src.cli import build_parser
+
+        help_text = build_parser().format_help()
+        self.assertIn("usage: pattern-recognition [-h] {run} ...", help_text)
+
+    def test_cli_run_logs_disabled_pipeline_completion(self):
         from src.cli import main
 
         with tempfile.TemporaryDirectory() as temporary:
@@ -31,9 +35,11 @@ class PackageImportTests(unittest.TestCase):
             root = ET.parse(ROOT / "config" / "pipeline.template.xml").getroot()
             _section(root, "logging/directory").text = str(project / "logs")
             ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
-            output = io.StringIO()
-            with redirect_stdout(output):
-                status = main(["run", "--config", str(path)])
+            status = main(["run", "--config", str(path)])
             self.assertEqual(status, 0)
-            self.assertIn("XML pipeline complete: no stages enabled", output.getvalue())
-            self.assertEqual(len(list((project / "logs").glob("*/run.log"))), 1)
+            logs = list((project / "logs").glob("*/run.log"))
+            self.assertEqual(len(logs), 1)
+            self.assertIn(
+                "XML pipeline complete: no stages enabled",
+                logs[0].read_text(encoding="utf-8"),
+            )

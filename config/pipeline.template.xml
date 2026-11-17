@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<pipelineConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="pipeline.xsd" version="1">
+<pipelineConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="pipeline.xsd" version="2">
   <logging>
     <directory>logs</directory>
     <level>INFO</level>
@@ -942,9 +942,8 @@
       </patientTimeline>
     </plotting>
   </preprocessing>
-  <model>
-    <activeModel>perceptron</activeModel>
-    <perceptron>
+  <models>
+    <model id="perceptron" type="perceptron">
       <run>false</run>
       <mode>train-validation</mode>
       <trainingValidation>
@@ -959,6 +958,17 @@
         <omit>
           <id>operation_diagnosis_proxy</id>
         </omit>
+        <features>
+          <feature id="age" type="numeric" />
+          <feature id="sex" type="categorical" />
+          <feature id="weight" type="numeric" />
+          <feature id="height" type="numeric" />
+          <feature id="bmi" type="numeric" />
+          <feature id="asa" type="categorical" />
+          <feature id="operation_diagnosis_proxy" type="categorical" />
+          <feature id="baseline_creatinine" type="numeric" />
+          <feature id="baseline_hemoglobin" type="numeric" />
+        </features>
       </trainingValidation>
       <novelData>
         <vectors>results/patient_vectors.csv</vectors>
@@ -969,6 +979,6 @@
         <run>false</run>
         <output>results/perceptron_confusion_matrix.html</output>
       </plotting>
-    </perceptron>
-  </model>
+    </model>
+  </models>
 </pipelineConfiguration>

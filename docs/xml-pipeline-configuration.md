@@ -5,8 +5,9 @@
 ## Structure and execution
 
 ```xml
-<pipelineConfiguration version="1">
+<pipelineConfiguration version="2">
   <logging>...</logging>
+  <!-- Omit preprocessing to run directly from model-owned clean data. -->
   <preprocessing>
     <run>false</run>
     <inputDirectory>data/patients</inputDirectory>
@@ -21,13 +22,25 @@
     <csvHeaderDescriptions>...</csvHeaderDescriptions>
     <plotting>...</plotting>
   </preprocessing>
-  <model>...</model>
+  <models>
+    <model id="perceptron-baseline" type="perceptron">
+      <run>false</run>
+      <mode>train-validation</mode>
+      <trainingValidation>
+        <vectors>data/clean/baseline/patient_vectors.csv</vectors>
+        <outcomes>data/clean/baseline/patient_outcomes.csv</outcomes>
+        <features><feature id="age" type="numeric" /></features>
+        ...
+      </trainingValidation>
+      ...
+    </model>
+  </models>
 </pipelineConfiguration>
 ```
 
-This is an outline; use the complete template for a runnable file. Relative paths resolve against the project root, the parent of `config/`; keep alternate configurations in that directory. The XML accepts one `inputDirectory`; direct `analyze` and `distributions` commands still accept multiple CSV files/directories.
+This is an outline; use the complete template for a runnable file. Relative paths resolve against the project root, the parent of `config/`; keep alternate configurations in that directory. The CLI exposes only the `run` subcommand; `--config` selects the XML file and defaults to `config/pipeline.xml`. There are no standalone `analyze`, `distributions`, `plot-time-series`, or `train-perceptron` commands. Version 2 allows the whole `<preprocessing>` or `<models>` section to be omitted. A missing preprocessing section skips preprocessing; `<preprocessing><run>false</run>` skips raw extraction/reports, while an explicitly enabled time-series plot may still read an existing `time_series.csv`. Configured models still run from their own input paths. A missing or empty `<models>` section means no models run.
 
-The runner initializes logging, writes enabled definition/header reports, extracts patients, generates preprocessing/time-series plots, executes the selected model, then builds the patient dashboard so it can embed completed study plots. A component's XSD declaration does not implement execution.
+The runner initializes logging, runs preprocessing when present and enabled—or an explicitly enabled time-series plot from an existing CSV when extraction is disabled—then runs each enabled model entry sequentially in XML order. The first model error stops the pipeline. The patient timeline is a preprocessing plot, so it can embed completed study plots but not model plots generated later. A component's XSD declaration does not implement execution.
 
 ```powershell
 py -3 -m pip install -r requirements.txt
@@ -100,7 +113,7 @@ The active discharge phrases and ICU datetime fields/timezone are candidates req
 
 ## Preprocessing reports and plotting
 
-`parameterDescriptions/run` writes a definition-only Markdown reference. `preprocessing/run` controls source-row extraction. Disabled preprocessing can still run independently enabled header inventories or plots against existing output files.
+When `<preprocessing>` is present and its top-level `run` is true, the pipeline reads source CSVs and writes patient vectors, outcomes, and measurements. `parameterDescriptions/run` controls the definition-only Markdown reference, and `csvHeaderDescriptions/run` controls the header inventory. `plotting/run` controls preprocessing heatmaps, patient missingness, and distributions; it does not gate extraction. If preprocessing is omitted or disabled, raw extraction and these reports are skipped. A separately enabled time-series plot can still consume an existing time-series CSV when preprocessing is disabled. Models never receive implicit preprocessing output paths: configure each model's inputs explicitly, including when those paths point to preprocessing outputs.
 
 ### CSV header descriptions
 
@@ -110,7 +123,7 @@ Reports can contain identifying filenames even though no patient rows are read. 
 
 ### Distribution and missingness plot selection
 
-Both `distributions` and `missingnessByPatient` have their own `run`, `phase`, `parameterIds/id` and `classNames/name` settings. `phase` accepts `all`, `preoperative`, `duringoperative` or `postoperative`; populated filters intersect, and empty lists mean all eligible mapped parameters in the chosen phase. Classes expand only their explicitly mapped XML members, not arbitrary raw CSV fields. Unknown names and empty explicit intersections are rejected. Plot selections never change extraction, outcome criteria or model inputs.
+The `distributions` and `missingnessByPatient` pipeline stages each have their own `run`, `phase`, `parameterIds/id` and `classNames/name` settings. `phase` accepts `all`, `preoperative`, `duringoperative` or `postoperative`; populated filters intersect, and empty lists mean all eligible mapped parameters in the chosen phase. Classes expand only their explicitly mapped XML members, not arbitrary raw CSV fields. Unknown names and empty explicit intersections are rejected. Plot selections never change extraction, outcome criteria or model inputs. These settings are not exposed as CLI subcommands or flags.
 
 ```xml
 <distributions>
@@ -131,7 +144,7 @@ Both `distributions` and `missingnessByPatient` have their own `run`, `phase`, `
 
 To migrate an earlier config, replace the boolean `<distributions>` and parent-level `<phase>`/`<bins>` with the nested distribution settings above. Add `<phase>preoperative</phase>`, `<parameterIds />` and `<classNames />` under an existing `missingnessByPatient` element; keep its current `run` and `output` values.
 
-Enable `plotting/run` for these children. Distributions use a positive `bins` count and patient-level CSV tables; they write plots under `parameter_distributions/` plus `parameter_distribution_summary.csv` and `parameter_distribution_categories.csv`. Missingness also requires preprocessing: it writes to its configured `output` (default `results/preoperative_missingness_heatmap.html`) and uses the selected phases' extracted observations (`1` missing, `0` present), sampled deterministically to at most 500 patients. Valid zero values are present, not missing. By default, distributions include all eligible mapped parameters and missingness includes pre-operative features. `theme` accepts `dark` or `light` across Plotly outputs.
+Set `preprocessing/run` to `true` to run extraction; set `preprocessing/plotting/run` to `true` to enable heatmaps, missingness, and distributions, then enable each child as needed. Distributions use a positive `bins` count and patient-level CSV tables; they write plots under `parameter_distributions/` plus `parameter_distribution_summary.csv` and `parameter_distribution_categories.csv`. Missingness writes to its configured `output` (default `results/preoperative_missingness_heatmap.html`) and uses the selected phases' extracted observations (`1` missing, `0` present), sampled deterministically to at most 500 patients. Valid zero values are present, not missing. By default, distributions include all eligible mapped parameters and missingness includes pre-operative features. `theme` accepts `dark` or `light` across Plotly outputs.
 
 ### Phase-relative time-series export
 
@@ -139,28 +152,24 @@ Enable `plotting/run` for these children. Distributions use a positive `bins` co
 
 ### Time-series plotting
 
-`plotting/timeSeries/run` is independent of the parent heatmap switch. It consumes existing/preprocessed `time_series.csv`, never reopens raw cohort files. With preprocessing enabled, `exportTimeSeries` must also be true. `groupBy` accepts `parameter` or `class`; empty `parameterIds`, `classNames`, `patientIds` means all eligible items, and populated filters intersect. Class plots keep unlike units on separate axes. The CSV stays in seconds; charts display elapsed hours.
-
-```powershell
-py -3 -m src.cli plot-time-series --group-by class --class epic.LAB --parameter during_creatinine --patient patient_001,patient_002
-```
+`plotting/timeSeries/run` is independent of the parent plotting switch and can run when preprocessing is disabled, provided the configured output directory already contains `time_series.csv`. It consumes that CSV and never reopens raw cohort files. When preprocessing is enabled, `exportTimeSeries` must also be true to create the input CSV during extraction. `groupBy` accepts `parameter` or `class`; empty `parameterIds`, `classNames`, `patientIds` means all eligible items, and populated filters intersect. Class plots keep unlike units on separate axes. The CSV stays in seconds; charts display elapsed hours. Configure these filters in XML, then use the `run --config ...` command shown above; there is no standalone time-series plotting command.
 
 ### Patient timeline dashboard
 
-`plotting/patientTimeline/run` independently enables the local HTML dashboard. Empty `patientIds` means all families; `compareAllPatients` chooses the initial comparison view, and `includeStudyPlots` embeds completed study charts lazily. `layout/chartHeight` is 320–900 pixels; `panelMaxHeight` is 120–900. Both remain typed and configurable.
+`plotting/patientTimeline/run` enables the local HTML dashboard when `preprocessing/run` is true; it does not depend on the parent plotting switch. Empty `patientIds` means all families; `compareAllPatients` chooses the initial comparison view, and `includeStudyPlots` embeds completed study charts lazily. `layout/chartHeight` is 320–900 pixels; `panelMaxHeight` is 120–900. Both remain typed and configurable.
 
 `duringOperative/availableClasses` preserves the 94-prefix visualization inventory; it does not add predictors. Untimed classes are excluded from numeric operation traces. Numeric fields are independently normalized for display with original values on hover. The sticky patient/series selectors preserve selected traces; a separate phase-aware event timeline exposes mapped row values and relative hours. Long event lists load in batches; pre/post/summary tables render when opened. Untimed demographics have their own panel. Patient-level values are embedded: keep the HTML and adjacent offline `plotly.min.js` bundle in approved storage.
 
 ## Models
 
-`model/activeModel` selects a registered configuration class; perceptron is currently implemented. Each model owns its configuration and execution handler. Under `model/perceptron`:
+`models/model` is a repeatable model instance. Its required `id` is unique within the pipeline, `type` selects a registered parser/runner, and its `run` child enables or skips that instance. Duplicate algorithms are allowed with different IDs; give each instance distinct output paths. The currently implemented type is `perceptron`. If `<models>` is absent or empty, the pipeline runs no model. Each model owns its clean-data inputs and outputs; the runner does not replace them with preprocessing output paths.
 
-- `run` enables execution; `mode` is `train-validation` or `novel-data`.
-- `trainingValidation` sets vector/outcome inputs, output sets/model, train fraction, epochs, seed and `omit/id`. The default omission remains `operation_diagnosis_proxy`; CLI `--omit` adds exclusions. Newly preprocessed vectors/outcomes take precedence over saved input paths.
+- `mode` is `train-validation` or `novel-data`.
+- `trainingValidation` sets this model's vector/outcome inputs, output sets/model, train fraction, epochs, seed, `omit/id`, and a required `<features>` list. Each `<feature id="..." type="numeric|categorical"/>` must describe a predictor column in that model's clean vector CSV. This replaces the preprocessing parameter map as the trainer's feature/type source. The default omission remains `operation_diagnosis_proxy`; configure exclusions in this model's XML.
 - `novelData` sets feature-only vectors, saved-model input and prediction output. Predictions contain no true target.
 - `plotting/run` writes a validation confusion matrix and is valid only in train-validation mode.
 
-Training joins by patient ID, fits encoders on training data only, and validates using prediction-only holdout exports. Labels are strictly `-1`/`+1`; `NA` is excluded rather than treated as a third class. A holdout result is not a calibrated probability.
+For pre-clean data, omit `<preprocessing>` or set its top-level `run` false, then configure each model's vector/outcome paths and feature schema. To train from files produced by preprocessing, set those same model-owned paths explicitly to the generated files. Training joins by patient ID, fits encoders on training data only, and validates using prediction-only holdout exports. Labels are strictly `-1`/`+1`; `NA` is excluded rather than treated as a third class. A holdout result is not a calibrated probability.
 
 ## Editing and validating
 
@@ -179,6 +188,10 @@ Runtime validation also checks semantics such as known IDs, matching phase owner
 ## Extending the schema and pipeline
 
 Create the component in its owning package; add and document its type/element in the single XSD, both XML examples, parser, execution path, guide and synthetic tests. Keep execution order deliberate. Add models under `src/models/<name>/`; register the parser in `MODEL_CONFIGS` and the handler in `MODEL_RUNNERS`. A parser alone is not a runnable model. See [code structure](code-structure.md).
+
+## Version 1 to version 2 migration
+
+Change the root `version` from `1` to `2`. Replace the singular `<model><activeModel>perceptron</activeModel><perceptron>...</perceptron></model>` with `<models><model id="perceptron" type="perceptron">...</model></models>`. Move the old perceptron `<run>` to the outer `<model>` entry; keep `mode`, training/validation, novel-data, and plotting settings inside it. Add `trainingValidation/features` entries for the clean vector columns and their types. The preprocessing block may be omitted; if retained with `run=false`, its child stages are skipped and model inputs still come from their configured paths. Both checked-in XML files use version 2.
 
 ## Migrating older local configurations
 

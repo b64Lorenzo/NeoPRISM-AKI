@@ -1,14 +1,11 @@
 """Synthetic tests for time-series plot selection and comparisons."""
 
 import csv
-import io
 import tempfile
 import unittest
-from contextlib import redirect_stderr
 from pathlib import Path
 from unittest.mock import patch
 
-from src.cli import main
 from src.plotlib.plotly_output import write_plotly_html
 from src.preprocessing.parameters.parameter_map import load_parameter_map
 from src.preprocessing.plotting.time_series.time_series_plots import TimeSeriesPlotter
@@ -136,42 +133,6 @@ class TimeSeriesPlotTests(unittest.TestCase):
         self.assertEqual(result["patient_count"], 1)
         self.assertEqual(result["observation_count"], 2)
         self.assertEqual(result["plots"][0].name, "epic.LAB.html")
-
-    def test_cli_plots_selected_patient_series(self):
-        output = self.root / "cli-plots"
-        result = main([
-            "plot-time-series",
-            "--input", str(self.input),
-            "--parameter-map", str(ROOT / "config" / "pipeline.template.xml"),
-            "--output", str(output),
-            "--group-by", "class",
-            "--class", "epic.LAB",
-            "--parameter", "during_creatinine",
-            "--patient", "patient_002",
-            "--log-dir", str(self.root / "logs"),
-        ])
-
-        self.assertEqual(result, 0)
-        self.assertTrue((output / "epic.LAB.html").is_file())
-
-    def test_cli_shows_safe_plot_dependency_diagnostic(self):
-        stderr = io.StringIO()
-        with redirect_stderr(stderr), patch(
-            "src.cli.TimeSeriesPlotter.generate",
-            side_effect=RuntimeError(
-                "Time-series plots require Plotly; install dependencies from requirements.txt"
-            ),
-        ):
-            result = main([
-                "plot-time-series",
-                "--input", str(self.input),
-                "--parameter-map", str(ROOT / "config" / "pipeline.template.xml"),
-                "--output", str(self.root / "error-plots"),
-                "--log-dir", str(self.root / "logs"),
-            ])
-
-        self.assertEqual(result, 2)
-        self.assertIn("Time-series plots require Plotly", stderr.getvalue())
 
     def test_missing_plotly_dependency_reports_install_path_without_output(self):
         output = self.root / "missing-plotly"

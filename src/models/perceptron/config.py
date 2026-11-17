@@ -10,7 +10,7 @@ from src.models.base import ModelConfig
 from src.models.novel_data.config import NovelDataConfig
 from src.models.plotting.config import PlotConfig
 from src.models.training_validation.config import TrainingValidationConfig
-from src.utils.utils import _boolean, _required
+from src.utils.utils import _required
 
 
 @dataclass(frozen=True)
@@ -18,7 +18,6 @@ class PerceptronModelConfig(ModelConfig):
     """Perceptron execution mode and typed child settings."""
 
     xml_name = "perceptron"
-    run: bool
     mode: str
     training_validation: TrainingValidationConfig
     novel_data: NovelDataConfig
@@ -40,7 +39,6 @@ class PerceptronModelConfig(ModelConfig):
         if model_plot.run and mode != "train-validation":
             raise ValueError("Perceptron validation plotting requires train-validation mode")
         return cls(
-            run=_boolean(element, "run"),
             mode=mode,
             training_validation=TrainingValidationConfig.from_xml(training, project_root),
             novel_data=NovelDataConfig.from_xml(novel, project_root),

@@ -134,7 +134,7 @@ class CsvHeaderDescriptionTests(unittest.TestCase):
                 self.assertEqual({row["family"] for row in csv.DictReader(stream)}, {"ref_0002"})
             self.assertIn("ref_0002.csv, ref_0002_1.csv", summary.read_text(encoding="utf-8"))
 
-    def test_xml_stage_runs_with_preprocessing_disabled_and_does_not_log_filenames(self):
+    def test_xml_stage_respects_preprocessing_gate_and_does_not_log_filenames(self):
         with tempfile.TemporaryDirectory() as temporary:
             project = Path(temporary)
             (project / "config").mkdir()
@@ -159,6 +159,16 @@ class CsvHeaderDescriptionTests(unittest.TestCase):
             stdout, stderr = io.StringIO(), io.StringIO()
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 self.assertEqual(main(["run", "--config", str(config_path)]), 0)
+
+            self.assertFalse((project / "results" / "csv_headers.csv").exists())
+            self.assertFalse((project / "results" / "csv_header_summary.md").exists())
+            self.assertFalse((project / "results" / "patient_vectors.csv").exists())
+
+            root.find("preprocessing/run").text = "true"
+            tree.write(config_path, encoding="utf-8", xml_declaration=True)
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["run", "--config", str(config_path)]), 0)
+
             self.assertTrue((project / "results" / "csv_headers.csv").exists())
             self.assertTrue((project / "results" / "csv_header_summary.md").exists())
             report = (project / "results" / "csv_header_summary.md").read_text(encoding="utf-8")
@@ -166,7 +176,7 @@ class CsvHeaderDescriptionTests(unittest.TestCase):
             self.assertIn("| epic.DEMOGRAPHICS.age | epic.DEMOGRAPHICS | 1 |", pre)
             self.assertIn("| epic.DEMOGRAPHICS | 1 |", pre)
             self.assertNotIn("epic.DEMOGRAPHICS.age", report.split("## Unassigned headers", 1)[1])
-            self.assertFalse((project / "results" / "patient_vectors.csv").exists())
+            self.assertTrue((project / "results" / "patient_vectors.csv").exists())
             self.assertNotIn("synthetic_1.csv", stderr.getvalue())
             for path in (project / "logs").rglob("run.log"):
                 self.assertNotIn("synthetic_1.csv", path.read_text(encoding="utf-8"))

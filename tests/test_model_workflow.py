@@ -9,7 +9,7 @@ from pathlib import Path
 class ModelWorkflowTests(unittest.TestCase):
     def test_shared_training_workflow_writes_disjoint_outputs_without_holdout_targets(self):
         from src.models.perceptron.runner import train_and_save
-        from src.models.training_validation.config import TrainingValidationConfig
+        from src.models.training_validation.config import TrainingFeatureConfig, TrainingValidationConfig
         from src.utils.table_io import read_csv_rows, write_csv_rows
 
         with tempfile.TemporaryDirectory() as temporary:
@@ -33,15 +33,9 @@ class ModelWorkflowTests(unittest.TestCase):
                 epochs=20,
                 seed=2,
                 omit=[],
+                features=(TrainingFeatureConfig("age", "numeric"),),
             )
-            model = train_and_save(
-                settings,
-                {
-                    "parameters": [
-                        {"id": "age", "phase": "Pre-operative", "parameter_type": "numeric"}
-                    ]
-                },
-            )
+            model = train_and_save(settings)
             train_fields, training = read_csv_rows(settings.training_set)
             validation_fields, validation = read_csv_rows(settings.validation_set)
             self.assertEqual(train_fields, ["patient_id", "age", "target"])

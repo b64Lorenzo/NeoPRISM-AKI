@@ -26,6 +26,20 @@ class XmlSchemaTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.schema.assertValid(self.etree.parse(str(ROOT / "config" / name)))
 
+    def test_schema_accepts_optional_preprocessing_and_repeated_models(self):
+        empty = self.etree.fromstring(
+            b"<pipelineConfiguration version='2'><logging><directory>logs</directory>"
+            b"<level>ERROR</level></logging><models/></pipelineConfiguration>"
+        )
+        self.schema.assertValid(empty)
+
+        root = ET.parse(ROOT / "config" / "pipeline.template.xml").getroot()
+        models = _section(root, "models")
+        second = copy.deepcopy(_section(models, "model"))
+        second.set("id", "perceptron-second")
+        models.append(second)
+        self.schema.assertValid(self.etree.fromstring(ET.tostring(root)))
+
     def test_schema_rejects_malformed_combined_parameter_sections(self):
         original = ET.parse(ROOT / "config" / "pipeline.template.xml").getroot()
         for case in (

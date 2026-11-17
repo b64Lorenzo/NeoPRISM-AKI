@@ -5,6 +5,7 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import cast
 
 from src.cli import main
 from src.models.novel_data.config import NovelDataConfig
@@ -37,17 +38,21 @@ class PipelineConfigurationTests(unittest.TestCase):
         self.assertEqual([phase.name for phase in PipelineConfig.load(ROOT / "config" / "pipeline.xml").preprocessing.parameters.phases], [
             "Pre-operative", "During-operative", "Post-operative"
         ])
-        self.assertEqual(config["model"]["active_model"], "perceptron")
-        active_model = config["model"]["active_config"]
-        self.assertIsInstance(active_model, PerceptronModelConfig)
-        self.assertIsInstance(active_model.training_validation, TrainingValidationConfig)
-        self.assertIsInstance(active_model.novel_data, NovelDataConfig)
-        self.assertIsInstance(active_model.plotting, PlotConfig)
-        self.assertEqual(active_model.training_validation.omit, ["operation_diagnosis_proxy"])
-        self.assertIsInstance(config["model"]["models"]["perceptron"]["run"], bool)
-        self.assertIn(config["model"]["models"]["perceptron"]["mode"], {"train-validation", "novel-data"})
+        self.assertEqual(len(config["models"]), 1)
+        model_entry = config["models"][0]
+        self.assertEqual(model_entry["id"], "perceptron")
+        self.assertEqual(model_entry["type"], "perceptron")
+        parsed_model = PipelineConfig.load(ROOT / "config" / "pipeline.xml").models.models[0].config
+        self.assertIsInstance(parsed_model, PerceptronModelConfig)
+        model_config = cast(PerceptronModelConfig, parsed_model)
+        self.assertIsInstance(model_config.training_validation, TrainingValidationConfig)
+        self.assertIsInstance(model_config.novel_data, NovelDataConfig)
+        self.assertIsInstance(model_config.plotting, PlotConfig)
+        self.assertEqual(model_config.training_validation.omit, ["operation_diagnosis_proxy"])
+        self.assertIsInstance(model_entry["run"], bool)
+        self.assertIn(model_entry["config"]["mode"], {"train-validation", "novel-data"})
         self.assertEqual(
-            config["model"]["models"]["perceptron"]["training_validation"]["omit"],
+            model_entry["config"]["training_validation"]["omit"],
             ["operation_diagnosis_proxy"],
         )
         self.assertEqual(config["logging"]["level"], "INFO")
@@ -124,7 +129,7 @@ class PipelineConfigurationTests(unittest.TestCase):
         self.assertFalse(config["preprocessing"]["plotting"]["time_series"]["run"])
         self.assertFalse(config["preprocessing"]["plotting"]["missingness_by_patient"]["run"])
         self.assertFalse(config["preprocessing"]["plotting"]["patient_timeline"]["run"])
-        self.assertFalse(config["model"]["models"]["perceptron"]["run"])
+        self.assertFalse(config["models"][0]["run"])
 
     def test_active_xml_configures_patient_missingness_plot_by_default(self):
         config = load_pipeline_config(ROOT / "config" / "pipeline.xml")
@@ -181,12 +186,12 @@ class PipelineConfigurationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "export_time_series=true"):
                 load_pipeline_config(path)
 
-    def test_unknown_active_model_is_rejected(self):
+    def test_unknown_model_type_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             config_path = Path(temporary) / "pipeline.xml"
             text = (ROOT / "config" / "pipeline.xml").read_text(encoding="utf-8")
             config_path.write_text(
-                text.replace("<activeModel>perceptron</activeModel>", "<activeModel>randomForest</activeModel>"),
+                text.replace('type="perceptron"', 'type="randomForest"'),
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "Unsupported model type: randomForest"):
@@ -249,15 +254,16 @@ class PipelineConfigurationTests(unittest.TestCase):
             root.find("preprocessing/parameterDescriptions/output").text = "results/parameter_reference.md"
             root.find("preprocessing/plotting/run").text = "false"
             root.find("preprocessing/plotting/distributions/run").text = "false"
-            root.find("model/perceptron/run").text = "true"
-            root.find("model/perceptron/mode").text = "train-validation"
-            root.find("model/perceptron/trainingValidation/trainingSet").text = "results/training_set.csv"
-            root.find("model/perceptron/trainingValidation/validationSet").text = "results/validation_set.csv"
-            root.find("model/perceptron/trainingValidation/modelOutput").text = "results/perceptron_model.json"
-            root.find("model/perceptron/novelData/modelInput").text = "results/perceptron_model.json"
-            root.find("model/perceptron/novelData/predictions").text = "results/novel_predictions.csv"
-            root.find("model/perceptron/plotting/run").text = "true"
-            root.find("model/perceptron/plotting/output").text = "results/perceptron_confusion_matrix.html"
+            root.find("preprocessing/plotting/run").text = "true"
+            root.find("models/model/run").text = "true"
+            root.find("models/model/mode").text = "train-validation"
+            root.find("models/model/trainingValidation/trainingSet").text = "results/training_set.csv"
+            root.find("models/model/trainingValidation/validationSet").text = "results/validation_set.csv"
+            root.find("models/model/trainingValidation/modelOutput").text = "results/perceptron_model.json"
+            root.find("models/model/novelData/modelInput").text = "results/perceptron_model.json"
+            root.find("models/model/novelData/predictions").text = "results/novel_predictions.csv"
+            root.find("models/model/plotting/run").text = "true"
+            root.find("models/model/plotting/output").text = "results/perceptron_confusion_matrix.html"
             ET.indent(root, space="  ")
             tree.write(config_path, encoding="utf-8", xml_declaration=True)
             self.assertEqual(
@@ -278,11 +284,11 @@ class PipelineConfigurationTests(unittest.TestCase):
             )
             self.assertTrue((results / "perceptron_confusion_matrix.html").is_file())
             dashboard_html = (results / "patient_timeline_dashboard.html").read_text(encoding="utf-8")
-            self.assertIn("perceptron_confusion_matrix.html", dashboard_html)
+            self.assertNotIn("perceptron_confusion_matrix.html", dashboard_html)
             self.assertIn("time_series_plots/", dashboard_html)
 
-            root.find("model/perceptron/mode").text = "novel-data"
-            root.find("model/perceptron/plotting/run").text = "false"
+            root.find("models/model/mode").text = "novel-data"
+            root.find("models/model/plotting/run").text = "false"
             ET.indent(root, space="  ")
             tree.write(config_path, encoding="utf-8", xml_declaration=True)
             self.assertEqual(main(["run", "--config", str(config_path)]), 0)

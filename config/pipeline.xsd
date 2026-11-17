@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
   <xs:simpleType name="ModelName">
-    <xs:annotation><xs:documentation>Name of the algorithm configuration selected by model/activeModel.</xs:documentation></xs:annotation>
+    <xs:annotation><xs:documentation>Registered model algorithm used by a model instance.</xs:documentation></xs:annotation>
     <xs:restriction base="xs:string">
       <xs:enumeration value="perceptron" />
     </xs:restriction>
@@ -46,21 +46,21 @@
     </xs:restriction>
   </xs:simpleType>
   <xs:element name="pipelineConfiguration">
-    <xs:annotation><xs:documentation>Root run configuration. Child order defines the pipeline: logging settings, preprocessing, then model.</xs:documentation></xs:annotation>
+    <xs:annotation><xs:documentation>Root run configuration. Logging is required; preprocessing and model collections are optional and run in that order.</xs:documentation></xs:annotation>
     <xs:complexType>
       <xs:sequence>
         <xs:element name="logging" type="LoggingType">
           <xs:annotation><xs:documentation>The logger configuration is stored directly under pipelineConfiguration.</xs:documentation></xs:annotation>
         </xs:element>
-        <xs:element name="preprocessing" type="PreprocessingType">
-          <xs:annotation><xs:documentation>Preprocessing stage. It executes before the model stage when enabled.</xs:documentation></xs:annotation>
+        <xs:element name="preprocessing" type="PreprocessingType" minOccurs="0">
+          <xs:annotation><xs:documentation>Optional preprocessing stage; omit it or set run=false to run configured models directly on their own clean-data paths.</xs:documentation></xs:annotation>
         </xs:element>
-        <xs:element name="model" type="ModelType">
-          <xs:annotation><xs:documentation>Model stage. It executes after preprocessing when enabled.</xs:documentation></xs:annotation>
+        <xs:element name="models" type="ModelsType" minOccurs="0">
+          <xs:annotation><xs:documentation>Optional collection of model instances. Omit it or leave it empty to run no models.</xs:documentation></xs:annotation>
         </xs:element>
       </xs:sequence>
-      <xs:attribute name="version" use="required" fixed="1">
-        <xs:annotation><xs:documentation>Pipeline configuration format version. Version 1 is currently supported.</xs:documentation></xs:annotation>
+      <xs:attribute name="version" use="required" fixed="2">
+        <xs:annotation><xs:documentation>Pipeline configuration format version. Version 2 supports optional preprocessing and multiple model instances.</xs:documentation></xs:annotation>
       </xs:attribute>
       <xs:anyAttribute namespace="http://www.w3.org/2001/XMLSchema-instance" processContents="lax" />
     </xs:complexType>
@@ -264,22 +264,19 @@
       </xs:element>
     </xs:sequence>
   </xs:complexType>
-  <xs:complexType name="ModelType">
-    <xs:annotation><xs:documentation>Model stage. activeModel names the model section whose settings are used.</xs:documentation></xs:annotation>
+  <xs:complexType name="ModelsType">
+    <xs:annotation><xs:documentation>Zero or more model instances; an empty collection is a valid no-model pipeline.</xs:documentation></xs:annotation>
     <xs:sequence>
-      <xs:element name="activeModel" type="ModelName">
-        <xs:annotation><xs:documentation>Name of the model subsection to execute.</xs:documentation></xs:annotation>
-      </xs:element>
-      <xs:element name="perceptron" type="PerceptronType">
-        <xs:annotation><xs:documentation>Perceptron-specific settings; additional model sections are declared here and in the schema sequence.</xs:documentation></xs:annotation>
+      <xs:element name="model" type="ModelInstanceType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation><xs:documentation>One independently configured model run with a unique ID, registered algorithm type, and run switch.</xs:documentation></xs:annotation>
       </xs:element>
     </xs:sequence>
   </xs:complexType>
-  <xs:complexType name="PerceptronType">
-    <xs:annotation><xs:documentation>Perceptron run switch, mode, training/validation settings, novel-data settings, and plots.</xs:documentation></xs:annotation>
+  <xs:complexType name="ModelInstanceType">
+    <xs:annotation><xs:documentation>Per-model run switch and perceptron-specific settings. Each instance resolves its inputs and outputs independently.</xs:documentation></xs:annotation>
     <xs:sequence>
       <xs:element name="run" type="xs:boolean">
-        <xs:annotation><xs:documentation>Whether the perceptron executes when it is the active model.</xs:documentation></xs:annotation>
+        <xs:annotation><xs:documentation>Whether this model instance executes; false skips it without affecting other instances.</xs:documentation></xs:annotation>
       </xs:element>
       <xs:element name="mode" type="RunMode">
         <xs:annotation><xs:documentation>Selects train-validation or novel-data prediction.</xs:documentation></xs:annotation>
@@ -294,15 +291,21 @@
         <xs:annotation><xs:documentation>Optional validation confusion-matrix plot settings.</xs:documentation></xs:annotation>
       </xs:element>
     </xs:sequence>
+    <xs:attribute name="id" type="xs:ID" use="required">
+      <xs:annotation><xs:documentation>Unique instance name used to distinguish runs and log their results.</xs:documentation></xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="type" type="ModelName" use="required">
+      <xs:annotation><xs:documentation>Registered algorithm configuration parser and runner to use for this instance.</xs:documentation></xs:annotation>
+    </xs:attribute>
   </xs:complexType>
   <xs:complexType name="TrainingValidationType">
     <xs:annotation><xs:documentation>Inputs, outputs, split settings, training limits, seed, and excluded feature IDs.</xs:documentation></xs:annotation>
     <xs:sequence>
       <xs:element name="vectors" type="xs:string">
-        <xs:annotation><xs:documentation>Feature-only patient vectors used when preprocessing is disabled.</xs:documentation></xs:annotation>
+        <xs:annotation><xs:documentation>Model-owned feature-only vectors; preprocessing never replaces this path.</xs:documentation></xs:annotation>
       </xs:element>
       <xs:element name="outcomes" type="xs:string">
-        <xs:annotation><xs:documentation>Patient-keyed outcome CSV used when preprocessing is disabled.</xs:documentation></xs:annotation>
+        <xs:annotation><xs:documentation>Model-owned patient-keyed outcome CSV; preprocessing never replaces this path.</xs:documentation></xs:annotation>
       </xs:element>
       <xs:element name="trainingSet" type="xs:string">
         <xs:annotation><xs:documentation>Destination CSV for labeled training rows.</xs:documentation></xs:annotation>
@@ -325,13 +328,40 @@
       <xs:element name="omit" type="IdListType">
         <xs:annotation><xs:documentation>Feature IDs to omit from training. Configure exclusions here, not in trainer code.</xs:documentation></xs:annotation>
       </xs:element>
+      <xs:element name="features" type="TrainingFeaturesType">
+        <xs:annotation><xs:documentation>Model-owned input feature IDs and value types for the configured clean vector file.</xs:documentation></xs:annotation>
+      </xs:element>
     </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="TrainingFeatureValueType">
+    <xs:annotation><xs:documentation>Input encoding selected from the clean-data schema, not the preprocessing parameter map.</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="numeric" />
+      <xs:enumeration value="categorical" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="TrainingFeaturesType">
+    <xs:annotation><xs:documentation>One or more features expected in this model's training vector CSV.</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="feature" type="TrainingFeatureType" minOccurs="1" maxOccurs="unbounded">
+        <xs:annotation><xs:documentation>One stable feature ID and its numeric or categorical encoding.</xs:documentation></xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TrainingFeatureType">
+    <xs:annotation><xs:documentation>Feature metadata owned by a model instance.</xs:documentation></xs:annotation>
+    <xs:attribute name="id" type="xs:token" use="required">
+      <xs:annotation><xs:documentation>Column ID present in the model's clean vector CSV.</xs:documentation></xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="type" type="TrainingFeatureValueType" use="required">
+      <xs:annotation><xs:documentation>numeric uses numeric scaling; categorical uses one-hot encoding.</xs:documentation></xs:annotation>
+    </xs:attribute>
   </xs:complexType>
   <xs:complexType name="NovelDataType">
     <xs:annotation><xs:documentation>Previously trained model and feature-only input/output paths for prediction.</xs:documentation></xs:annotation>
     <xs:sequence>
       <xs:element name="vectors" type="xs:string">
-        <xs:annotation><xs:documentation>Feature-only patient vectors used when preprocessing is disabled.</xs:documentation></xs:annotation>
+        <xs:annotation><xs:documentation>Model-owned feature-only vectors; preprocessing never replaces this path.</xs:documentation></xs:annotation>
       </xs:element>
       <xs:element name="modelInput" type="xs:string">
         <xs:annotation><xs:documentation>Previously trained model JSON used for prediction.</xs:documentation></xs:annotation>

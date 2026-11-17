@@ -7,7 +7,7 @@ from pathlib import Path
 
 from src.models.base import ModelConfig
 from src.models.perceptron.config import PerceptronModelConfig
-from src.utils.utils import _required, _section
+
 
 MODEL_CONFIGS: dict[str, type[ModelConfig]] = {"perceptron": PerceptronModelConfig}
 
@@ -23,9 +23,11 @@ def register_model_config(name: str):
     return register
 
 
-def parse_active_model(element: ET.Element, project_root: Path) -> tuple[str, ModelConfig]:
-    name = _required(element, "activeModel")
+def parse_model_config(element: ET.Element, project_root: Path) -> tuple[str, ModelConfig]:
+    name = element.get("type", "").strip()
+    if not name:
+        raise ValueError("Each model requires a type attribute")
     model_type = MODEL_CONFIGS.get(name)
     if model_type is None:
         raise ValueError(f"Unsupported model type: {name}")
-    return name, model_type.from_xml(_section(element, name), project_root)
+    return name, model_type.from_xml(element, project_root)

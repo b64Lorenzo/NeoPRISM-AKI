@@ -1,5 +1,3 @@
-import csv
-import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,9 +5,6 @@ from unittest.mock import patch
 
 from src.models.perceptron.perceptron import plot_confusion_matrix, train_model
 from src.plotlib.plotly_output import write_plotly_html
-
-ROOT = Path(__file__).resolve().parents[1]
-PARAMETER_MAP = ROOT / "config" / "pipeline.xml"
 
 
 class PerceptronTests(unittest.TestCase):
@@ -104,68 +99,6 @@ class PerceptronTests(unittest.TestCase):
         self.assertEqual([row["target"] for row in joined], ["-1", "1"])
         with self.assertRaisesRegex(ValueError, "patient_id sets do not match"):
             _join_patient_vectors(vectors, outcomes[:1])
-
-    def test_cli_creates_labeled_training_and_unlabeled_validation_sets_and_reports_mislabeling(self):
-        from src.cli import main
-
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            vectors_path = root / "patient_vectors.csv"
-            outcomes_path = root / "patient_outcomes.csv"
-            with vectors_path.open("w", newline="", encoding="utf-8") as stream:
-                writer = csv.DictWriter(
-                    stream,
-                    fieldnames=["patient_id", "age", "operation_diagnosis_proxy"],
-                )
-                writer.writeheader()
-                for value in range(20):
-                    writer.writerow({
-                        "patient_id": f"p{value}",
-                        "age": value,
-                        "operation_diagnosis_proxy": "",
-                    })
-            with outcomes_path.open("w", newline="", encoding="utf-8") as stream:
-                writer = csv.DictWriter(stream, fieldnames=["patient_id", "target"])
-                writer.writeheader()
-                for value in reversed(range(20)):
-                    target = "NA" if value == 0 else "-1" if value < 10 else "1"
-                    writer.writerow({"patient_id": f"p{value}", "target": target})
-
-            model_path = root / "model.json"
-            training_path = root / "training_set.csv"
-            validation_path = root / "validation_set.csv"
-            result = main([
-                "train-perceptron",
-                "--input", str(vectors_path),
-                "--outcomes", str(outcomes_path),
-                "--parameter-map", str(PARAMETER_MAP),
-                "--model", str(model_path),
-                "--training-set", str(training_path),
-                "--validation-set", str(validation_path),
-                "--train-fraction", "0.7",
-                "--epochs", "20",
-                "--seed", "19",
-                "--omit", "sex,asa,weight,height,bmi,baseline_creatinine,baseline_hemoglobin",
-                "--log-dir", str(root / "logs"),
-            ])
-
-            self.assertEqual(result, 0)
-            model = json.loads(model_path.read_text(encoding="utf-8"))
-            with training_path.open(newline="", encoding="utf-8") as stream:
-                training = list(csv.DictReader(stream))
-            with validation_path.open(newline="", encoding="utf-8") as stream:
-                validation = list(csv.DictReader(stream))
-            self.assertEqual(model["omitted_parameters"], ["sex", "asa", "weight", "height", "bmi", "baseline_creatinine", "baseline_hemoglobin", "operation_diagnosis_proxy"])
-            self.assertEqual(len(training), model["training_size"])
-            self.assertEqual(len(validation), model["validation_size"])
-            self.assertTrue(all(row["target"] in {"-1", "1"} for row in training))
-            self.assertNotIn("target", validation[0])
-            self.assertTrue(all(row["prediction"] in {"-1", "1"} for row in validation))
-            self.assertEqual(model["misclassified"], 0)
-            self.assertEqual(model["misclassified"], model["confusion"]["failure_predicted_success"] + model["confusion"]["success_predicted_failure"])
-            self.assertEqual(model["generalization_error"], model["mislabeling_rate"])
-            self.assertTrue(all("patient_id" not in name for name in model["feature_names"]))
-
 
 if __name__ == "__main__":
     unittest.main()

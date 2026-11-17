@@ -4,7 +4,7 @@ Packages follow structured XML components. A component owns its parser and imple
 
 ```text
 src/
-  cli.py                         # Direct commands and XML run entrypoint
+  cli.py                         # Single XML pipeline run entrypoint
   pipeline/                      # Root configuration and stage orchestration
   logging/                       # LoggingConfig and per-run Logger
   preprocessing/
@@ -33,9 +33,10 @@ src/
     row_pipeline.py              # Distinct historical row-oriented analysis
   models/
     base.py                      # Model configuration interface
-    registry.py                  # XML model-name → configuration class
+    config.py                    # Optional model instances and per-instance IDs
+    registry.py                  # XML model type → configuration class
     runner.py                    # Configuration class → execution handler
-    training_validation/         # Reusable supervised-training settings
+    training_validation/         # Supervised settings and model-owned feature schema
     novel_data/                  # Saved-model prediction input/output settings
     plotting/                    # Reusable model-plot settings
     perceptron/                  # Algorithm, own configuration and shared train/save workflow
@@ -47,42 +48,28 @@ src/
 
 ## Runtime flow
 
-`python -m src.cli` dispatches one of five commands. `run` parses the XML-owned component configs and executes their stages in order; the direct commands call the same lower-level services without the XML stage orchestrator.
+`python -m src.cli` exposes one subcommand: `run`. Its `--config` option selects the XML pipeline configuration; the default is `config/pipeline.xml`. Preprocessing, plotting, and model behavior are selected through that configuration, not separate CLI commands.
 
 ```mermaid
 flowchart TD
-    cli["python -m src.cli"] --> command{"CLI command"}
-    command -->|run| load["PipelineConfig.load(config XML)"]
-    load --> components["Parse typed component configs; resolve project-relative paths"]
-    components --> catalog["Load parameter catalog; selected_map() applies enabled phase filters"]
-    catalog --> pipeline["run_pipeline()"]
-    pipeline --> logger["Start configured Logger"]
-    logger --> reference{"parameterDescriptions.run?"}
-    reference -->|yes| referenceOut["Write definition-only Markdown reference"]
-    reference -->|no| headers{"csvHeaderDescriptions.run?"}
-    referenceOut --> headers
-    headers -->|yes| inventory["Inventory CSV headers only"]
-    headers -->|no| preprocess{"preprocessing.run?"}
-    inventory --> preprocess
-    preprocess -->|yes| analyze["analyze_inputs(); generate configured feature and missingness heatmaps"]
-    preprocess -->|no| existing["Use existing output files for later enabled stages"]
-    analyze --> distributions{"plotting.run and distributions.run?"}
-    existing --> distributions
-    distributions -->|yes| distributionPlots["Generate parameter-distribution plots"]
-    distributions -->|no| timePlots{"timeSeries.run?"}
-    distributionPlots --> timePlots
-    timePlots -->|yes| timeSeriesPlots["Read outputDirectory/time_series.csv and plot"]
-    timePlots -->|no| model["Dispatch active model runner; it checks model.run"]
-    timeSeriesPlots --> model
-    model --> timeline{"patientTimeline.run?"}
-    timeline -->|yes| dashboard["Build timeline from inputDirectory; optionally embed completed plots"]
-    timeline -->|no| summary["Log completed stages"]
-    dashboard --> summary
+    cli["python -m src.cli run --config ..."] --> load["PipelineConfig.load(config XML)"]
+    load --> pipeline["run_pipeline(); start configured Logger"]
+    pipeline --> preprocessing{"preprocessing present and run?"}
+    preprocessing -->|no| existingTS{"preprocessing config has timeSeries.run?"}
+    preprocessing -->|yes| reports["Run enabled reports, extraction, and plots"]
+    existingTS -->|yes| plotExisting["Plot existing time_series.csv"]
+    existingTS -->|no| models{"models section has entries?"}
+    plotExisting --> models
+    reports --> models
+    models -->|no| summary["Log completed stages / no stages enabled"]
+    models -->|yes| instance{"next model entry enabled?"}
+    instance -->|no| next["Skip disabled entry"]
+    instance -->|yes| dispatch["Dispatch by model type using its configured clean-data paths"]
+    next --> more{"more entries?"}
+    dispatch --> more
+    more -->|yes| instance
+    more -->|no| summary
 
-    command -->|analyze| directAnalyze["Load parameter map → analyze_inputs()"]
-    command -->|distributions| directDistributions["analyze_inputs() → distribution plots"]
-    command -->|plot-time-series| directTimeSeries["Read time_series.csv → TimeSeriesPlotter"]
-    command -->|train-perceptron| directTrain["Load XML omissions → train_and_save()"]
 ```
 
 ### Patient data and model flow
@@ -125,7 +112,9 @@ The post-operative stay-end event supports duration summaries; it does not trunc
 from src.pipeline.config import PipelineConfig, load_pipeline_config
 
 config = PipelineConfig.load("config/pipeline.xml")  # Typed tree; no patient data opened
-selected = config.preprocessing.parameters.selected_map()
+if config.preprocessing is not None:
+    selected = config.preprocessing.parameters.selected_map()
+model_instances = config.models.models
 runtime = load_pipeline_config("config/pipeline.xml")  # Runtime dictionary
 ```
 
@@ -135,7 +124,7 @@ Shared XML readers live in `src/utils/utils.py`; common dataclass projection and
 
 ## Models
 
-Add a model under `src/models/<name>/`, subclass `ModelConfig`, and register its configuration class in `MODEL_CONFIGS`. Register its execution handler in `MODEL_RUNNERS`; a parser alone does not make a model runnable. Both the direct CLI and XML perceptron execution use `train_and_save`, preserving patient-keyed joining and prediction-only holdout exports. Outcome rules belong to postoperative preprocessing, not to the classifier.
+Add a model under `src/models/<name>/`, subclass `ModelConfig`, and register its configuration class in `MODEL_CONFIGS`. Register its execution handler in `MODEL_RUNNERS`; a parser alone does not make a model runnable. The pipeline parses zero or more `<models><model id="..." type="...">` entries and invokes each enabled entry in order. Each model owns its clean-data paths; the generic runner does not inject preprocessing outputs or a global parameter map. The perceptron declares its vector feature IDs and numeric/categorical types in its own training configuration. Its `train_and_save` workflow preserves patient-keyed joining and prediction-only holdout exports. Outcome rules belong to preprocessing, not to the classifier.
 
 Update `config/pipeline.xsd`, both XML examples, documentation, and synthetic tests when adding a structured node. Keep the XSD's named types and element documentation complete. Old flat `src.*` module imports are replaced by the component paths above; there are no duplicate compatibility modules.
 

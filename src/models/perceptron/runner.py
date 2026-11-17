@@ -1,10 +1,8 @@
-"""Shared perceptron workflows for the direct CLI and XML pipeline."""
+"""Perceptron workflows for the XML-configured pipeline."""
 
 from __future__ import annotations
 
 import json
-from dataclasses import replace
-from pathlib import Path
 
 from src.logging.logger import Logger, LogLevel
 from src.models.perceptron.config import PerceptronModelConfig
@@ -13,13 +11,11 @@ from src.models.training_validation.config import TrainingValidationConfig
 from src.utils.table_io import join_patient_vectors, read_csv_rows, write_csv_rows
 
 
-def train_and_save(settings: TrainingValidationConfig, parameter_map: dict) -> dict:
+def train_and_save(settings: TrainingValidationConfig) -> dict:
     _, vectors = read_csv_rows(settings.vectors)
     _, outcomes = read_csv_rows(settings.outcomes)
     rows = join_patient_vectors(vectors, outcomes)
-    features = [
-        item for item in parameter_map["parameters"] if item.get("phase") == "Pre-operative"
-    ]
+    features = [feature.as_parameter() for feature in settings.features]
     if not features:
         raise ValueError("Perceptron training needs at least one selected pre-operative parameter")
     model = train_model(
@@ -41,26 +37,14 @@ def train_and_save(settings: TrainingValidationConfig, parameter_map: dict) -> d
 
 def run_perceptron(
     config: PerceptronModelConfig,
-    parameter_map: dict,
     logger: Logger,
-    *,
-    generated_directory: Path | None = None,
-    theme: str = "light",
 ) -> list[str]:
-    if not config.run:
-        return []
     completed = []
     if config.mode == "train-validation":
         settings = config.training_validation
-        if generated_directory is not None:
-            settings = replace(
-                settings,
-                vectors=generated_directory / "patient_vectors.csv",
-                outcomes=generated_directory / "patient_outcomes.csv",
-            )
-        model = train_and_save(settings, parameter_map)
+        model = train_and_save(settings)
         if config.plotting.run:
-            plot_confusion_matrix(model, config.plotting.output, theme=theme)
+            plot_confusion_matrix(model, config.plotting.output)
             completed.append("perceptron plot")
         logger.write(
             LogLevel.INFO,
@@ -71,12 +55,7 @@ def run_perceptron(
         )
         return [*completed, "perceptron training/validation"]
     settings = config.novel_data
-    vectors = (
-        generated_directory / "patient_vectors.csv"
-        if generated_directory is not None
-        else settings.vectors
-    )
-    fields, rows = read_csv_rows(vectors)
+    fields, rows = read_csv_rows(settings.vectors)
     if "target" in fields:
         raise ValueError("Novel-data input must contain features only, without target labels")
     model = json.loads(settings.model_input.read_text(encoding="utf-8"))

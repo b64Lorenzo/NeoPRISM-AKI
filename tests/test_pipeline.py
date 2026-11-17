@@ -2,8 +2,9 @@ import csv
 import io
 import tempfile
 import unittest
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import redirect_stderr
 from pathlib import Path
+from unittest.mock import patch
 
 from src.cli import main
 from src.logging.logger import Logger
@@ -32,6 +33,22 @@ class PipelineTests(unittest.TestCase):
             writer.writerow(["", "M", "", "3.5", "severe problems", "60"])
             writer.writerow(["NA", "", "0", "", "optimal condition", "65"])
         return source
+
+    def test_cli_failure_logs_and_prints_same_detailed_message(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            errors = io.StringIO()
+            with patch("src.cli.ROOT", root), patch(
+                "src.cli.run_pipeline", side_effect=RuntimeError("bad config")
+            ), redirect_stderr(errors):
+                exit_code = main(["run", "--config", str(root / "broken.xml")])
+
+            expected = "Command failed (RuntimeError): bad config"
+            self.assertEqual(exit_code, 2)
+            self.assertEqual(errors.getvalue().splitlines()[-1], expected)
+            log_files = list((root / "logs").glob("*/run.log"))
+            self.assertEqual(len(log_files), 1)
+            self.assertIn(expected, log_files[0].read_text(encoding="utf-8"))
 
     def test_extracts_only_requested_phases_and_labels_postoperative_outcome(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -122,30 +139,6 @@ class PipelineTests(unittest.TestCase):
             report = (root / "results/missingness_report.md").read_text(encoding="utf-8")
             self.assertIn("complete cases", report.lower())
             self.assertIn("do not determine the missingness mechanism", report)
-
-    def test_cli_analyze_creates_artifacts_and_uses_logger(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            source = self.make_input(root)
-            output = io.StringIO()
-            errors = io.StringIO()
-            with redirect_stdout(output), redirect_stderr(errors):
-                exit_code = main([
-                    "analyze",
-                    str(source),
-                    "--output", str(root / "results"),
-                    "--log-dir", str(root / "logs"),
-                    "--outcome-column", "operation result",
-                ])
-            self.assertEqual(exit_code, 0)
-            self.assertIn("Analysis complete: 1 patient(s)", output.getvalue())
-            self.assertTrue((root / "results/extraction_report.md").is_file())
-            self.assertEqual(len(list((root / "results").glob("*.csv"))), 5)
-            log_files = list((root / "logs").glob("*/run.log"))
-            self.assertEqual(len(log_files), 1)
-            log_text = log_files[0].read_text(encoding="utf-8")
-            self.assertIn("analysis completed", log_text)
-            self.assertNotIn("sample.csv", log_text)
 
     def test_no_matched_preoperative_fields_do_not_count_as_complete_cases(self):
         with tempfile.TemporaryDirectory() as temporary:

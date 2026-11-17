@@ -1,6 +1,6 @@
 # Pattern Recognition
 
-Course project for a configurable patient-CSV workflow: extract pre-operative features, derive postoperative labels, and train a perceptron baseline.
+Course project for a configurable patient-CSV workflow: optionally extract pre-operative features and postoperative labels, then run zero or more model instances (currently the perceptron baseline) against their configured clean-data inputs.
 
 ## Quick start
 
@@ -14,20 +14,13 @@ py -3 -m src.cli --help
 
 ## Run the pipeline
 
-Before running the active configuration, review `config/pipeline.xml`: its input path or enabled stages may refer to an external cohort. The disabled `config/pipeline.template.xml` is the starter. Keep cohort inputs, patient-level outputs, and logs in approved storage; default output folders are ignored by Git, but custom folders may not be.
+Before running the active configuration, review `config/pipeline.xml`: enabled preprocessing or model inputs may refer to an external cohort or clean-data files. The disabled `config/pipeline.template.xml` is the starter. Pipeline XML version 2 allows preprocessing and the model collection to be omitted; each model instance owns its input paths and feature schema, and an empty model collection is a valid no-model run. Keep cohort inputs, patient-level outputs, and logs in approved storage; default output folders are ignored by Git, but custom folders may not be.
 
 ```powershell
 py -3 -m src.cli run --config config/pipeline.xml
 ```
 
-For direct workflows, use `analyze` on an explicitly selected cohort folder and train from its outputs:
-
-```powershell
-py -3 -m src.cli analyze "C:\path\to\patient-csvs" --output "C:\path\to\results"
-py -3 -m src.cli train-perceptron --help
-py -3 -m src.cli distributions "C:\path\to\patient-csvs" --output "C:\path\to\results" --phase all --bins 20
-py -3 -m src.cli plot-time-series --input results/time_series.csv
-```
+The CLI has one subcommand, `run`; `--config` selects the XML pipeline configuration. Extraction, plotting, and model stages are controlled in that XML rather than through separate CLI commands. See the [XML pipeline guide](docs/xml-pipeline-configuration.md) for version 1 migration details and configuration examples.
 
 ## Data and outputs
 
@@ -41,7 +34,7 @@ All automated fixtures are synthetic; they do not establish clinical validity. C
 
 | Topic | Guide |
 |---|---|
-| Current CLI extraction and outputs | [CSV extraction](docs/data-extraction.md) |
+| Patient CSV extraction and outputs | [CSV extraction](docs/data-extraction.md) |
 | Patient grouping, vectors, and artifacts | [Patient-vector workflow](docs/patient-vectors.md) |
 | Feature definitions and BMI | [Pre-operative parameters](docs/preoperative-parameters.md) |
 | Outcome evidence and limitations | [Post-operative outcomes](docs/postoperative-outcomes.md) |
