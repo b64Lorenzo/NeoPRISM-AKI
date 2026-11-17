@@ -22,14 +22,6 @@ py -3 -m src.cli run --config config/pipeline.xml
 
 The CLI has one subcommand, `run`; `--config` selects the XML pipeline configuration. Extraction, plotting, and model stages are controlled in that XML rather than through separate CLI commands. See the [XML pipeline guide](docs/xml-pipeline-configuration.md) for version 1 migration details and configuration examples.
 
-## Data and outputs
-
-Same-directory numbered CSV parts are grouped into one patient family. `patient_vectors.csv` contains pre-operative inputs only; `patient_outcomes.csv` stores postoperative-derived labels separately. Training joins by `patient_id`. Labels are `-1` (failure), `+1` (success), or `NA` (unclassified); failure evidence takes precedence, and `NA` is excluded from training. Validation exports predictions without the true target. The perceptron is a hard classifier, not a calibrated probability estimator.
-
-Analysis also writes `postoperative_measurements.csv` for review. `duringoperative_measurements.csv` and phase-relative `time_series.csv` are optional. The checked-in `during_creatinine` mapping is illustrative; verify source availability, timing, and units. Distribution and missingness plots have independent phase, parameter-ID, and mapped-class filters in XML; these filters affect plots only, not model inputs. Heatmaps, a patient timeline, distributions, and time-series plots are configurable; see the guides below. Existing output files are not cleaned up between runs—use a fresh directory when needed. Logs are written to `logs/<UTC-run-id>/run.log` and mirrored to stderr.
-
-All automated fixtures are synthetic; they do not establish clinical validity. Confirm field meanings, units, event boundaries, and outcome definitions with the data owner before cohort use.
-
 ## Project guides
 
 | Topic | Guide |
