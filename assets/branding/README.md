@@ -1,9 +1,9 @@
 # NeoPRISM-AKI identity assets
 
-These original assets take broad inspiration from the parent NeoPRISM project's restrained dark palette and technical research tone. They do not reuse its logo or banner composition.
+These project-specific assets adapt the original NeoPRISM prism concept and dark technical palette for the AKI research scope. The prism/signal mark, typography, copy, and layout are redrawn here; model extensions are identified as planned rather than shipped capabilities.
 
-- `mark.svg` — scalable square mark; the connected N and three nodes suggest a staged workflow.
-- `banner.svg` — README/project banner.
+- `mark.svg` — scalable square mark; a data signal passes through a triangular prism and separates into model-output paths.
+- `banner.svg` — README/project banner; highlights the planned multi-output perceptron and extensible model families, with no release/version text.
 - `workflow.svg` — current preprocessing-to-model workflow; the label safeguard is intentional.
 - `mark.png`, `banner.png`, `workflow.png` — raster exports for documents and compatible platforms.
 - `social-preview.png` — 1280 × 640 repository social-preview export.

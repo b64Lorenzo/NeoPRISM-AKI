@@ -1,10 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
   <title id="title">NeoPRISM-AKI mark</title>
-  <desc id="desc">A connected N-shaped path with three nodes, representing a staged research workflow.</desc>
-  <rect width="512" height="512" rx="92" fill="#091721"/>
-  <rect x="16" y="16" width="480" height="480" rx="78" fill="none" stroke="#263c47" stroke-width="2"/>
-  <path d="M160 355 V157 L352 355 V157" fill="none" stroke="#63d8d2" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="160" cy="355" r="17" fill="#091721" stroke="#63d8d2" stroke-width="9"/>
-  <circle cx="256" cy="256" r="21" fill="#eef7f6" stroke="#091721" stroke-width="8"/>
-  <circle cx="352" cy="157" r="17" fill="#091721" stroke="#63d8d2" stroke-width="9"/>
+  <desc id="desc">A research signal passes through a triangular prism and separates into multiple model-output paths.</desc>
+  <rect width="512" height="512" rx="44" fill="#0b1728"/>
+  <path d="M30 256 H68 L82 236 L96 275 L112 204 L128 256 H169" fill="none" stroke="#38bdf8" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M256 65 L116 372 H396 Z" fill="#16364f" stroke="#7dd3fc" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M166 256 H256" fill="none" stroke="#38bdf8" stroke-width="7" stroke-linecap="round"/>
+  <path d="M256 256 L305 226 L478 126" fill="none" stroke="#38bdf8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M256 256 L305 242 L478 184" fill="none" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M256 256 H478" fill="none" stroke="#a78bfa" stroke-width="7" stroke-linecap="round"/>
+  <path d="M256 256 L305 270 L478 328" fill="none" stroke="#fbbf24" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M256 256 L305 286 L478 386" fill="none" stroke="#fb7185" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="256" cy="256" r="9" fill="#f8fafc"/>
 </svg>

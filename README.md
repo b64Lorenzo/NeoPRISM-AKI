@@ -2,9 +2,9 @@
 
 [![Latest release](https://img.shields.io/github/v/release/b64Lorenzo/pattern-recognition-course)](https://github.com/b64Lorenzo/pattern-recognition-course/releases/latest)
 
-![NeoPRISM-AKI — perioperative research framework](assets/branding/banner.png)
+![NeoPRISM-AKI prism banner — preprocessing, missingness analysis, and model roadmap](assets/branding/banner.png)
 
-NeoPRISM-AKI is a research-only Python framework for retrospective perioperative data. It preserves configurable parameter extraction, phase-aware missingness views, patient-level model inputs, and a **binary Rosenblatt perceptron** baseline.
+NeoPRISM-AKI is a research-only Python framework for retrospective perioperative data. It currently provides configurable parameter extraction, phase-aware missingness views, patient-level model inputs, and a **binary Rosenblatt perceptron** baseline. Planned model extensions include a multi-output perceptron and additional model families.
 
 **The project does not infer clinical AKI outcomes from missing measurements.** A clinically adjudicated label CSV is required for training. Unknown labels remain unknown and are excluded from training, never converted to No AKI. The model produces **hard class labels and uncalibrated linear scores**, not AKI risk probabilities. It is not a clinical decision-support system.
 

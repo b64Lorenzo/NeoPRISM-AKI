@@ -1,25 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="560" viewBox="0 0 1600 560" role="img" aria-labelledby="title desc">
   <title id="title">NeoPRISM-AKI perioperative research framework</title>
-  <desc id="desc">A dark, restrained banner introducing configurable extraction, missingness views, and patient-level model inputs. Research software only.</desc>
-  <rect width="1600" height="560" fill="#091721"/>
-  <path d="M480 76 V484" stroke="#263c47" stroke-width="2"/>
-  <svg x="72" y="92" width="360" height="360" viewBox="0 0 512 512">
-    <rect width="512" height="512" rx="92" fill="#0e202b"/>
-    <rect x="16" y="16" width="480" height="480" rx="78" fill="none" stroke="#263c47" stroke-width="2"/>
-    <path d="M160 355 V157 L352 355 V157" fill="none" stroke="#63d8d2" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="160" cy="355" r="17" fill="#0e202b" stroke="#63d8d2" stroke-width="9"/>
-    <circle cx="256" cy="256" r="21" fill="#eef7f6" stroke="#0e202b" stroke-width="8"/>
-    <circle cx="352" cy="157" r="17" fill="#0e202b" stroke="#63d8d2" stroke-width="9"/>
+  <desc id="desc">A prism disperses a perioperative data signal into multiple model paths. The planned model scope includes a multi-output perceptron and additional model families. Research software only.</desc>
+  <rect width="1600" height="560" fill="#0b1728"/>
+  <path d="M492 72 V490" stroke="#334155" stroke-width="2"/>
+  <svg x="52" y="72" width="420" height="420" viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="44" fill="#0b1728"/>
+    <path d="M30 256 H68 L82 236 L96 275 L112 204 L128 256 H169" fill="none" stroke="#38bdf8" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M256 65 L116 372 H396 Z" fill="#16364f" stroke="#7dd3fc" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M166 256 H256" fill="none" stroke="#38bdf8" stroke-width="7" stroke-linecap="round"/>
+    <path d="M256 256 L305 226 L478 126" fill="none" stroke="#38bdf8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M256 256 L305 242 L478 184" fill="none" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M256 256 H478" fill="none" stroke="#a78bfa" stroke-width="7" stroke-linecap="round"/>
+    <path d="M256 256 L305 270 L478 328" fill="none" stroke="#fbbf24" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M256 256 L305 286 L478 386" fill="none" stroke="#fb7185" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="256" cy="256" r="9" fill="#f8fafc"/>
   </svg>
-  <text x="530" y="151" fill="#91aab4" font-family="Segoe UI, Aptos, sans-serif" font-size="17" font-weight="600" letter-spacing="3">PERIOPERATIVE RESEARCH  /  RELEASE 0.1.0</text>
-  <text x="525" y="242" fill="#f0f6f5" font-family="Segoe UI, Aptos, sans-serif" font-size="70" font-weight="700">NeoPRISM<tspan fill="#63d8d2">-AKI</tspan></text>
-  <text x="530" y="294" fill="#d8e4e5" font-family="Segoe UI, Aptos, sans-serif" font-size="28" font-weight="400">Configurable perioperative AKI research framework</text>
-  <text x="530" y="333" fill="#91aab4" font-family="Segoe UI, Aptos, sans-serif" font-size="21" font-weight="400">Parameter extraction · missingness plots · patient-level model inputs</text>
-  <path d="M530 371 H1518" stroke="#263c47" stroke-width="2"/>
-  <g font-family="Segoe UI, Aptos, sans-serif" font-size="18" font-weight="650" letter-spacing="1.5">
-    <text x="530" y="423" fill="#63d8d2">01</text><text x="568" y="423" fill="#e3ecec">EXTRACT</text>
-    <text x="820" y="423" fill="#63d8d2">02</text><text x="858" y="423" fill="#e3ecec">EXPLORE</text>
-    <text x="1110" y="423" fill="#63d8d2">03</text><text x="1148" y="423" fill="#e3ecec">MODEL</text>
-  </g>
-  <text x="530" y="493" fill="#91aab4" font-family="Segoe UI, Aptos, sans-serif" font-size="16" font-weight="600" letter-spacing="1.2">RESEARCH SOFTWARE · NOT FOR CLINICAL DECISION-MAKING</text>
+  <text x="540" y="144" fill="#94a3b8" font-family="Segoe UI, Aptos, sans-serif" font-size="18" font-weight="600" letter-spacing="3">PERIOPERATIVE AKI RESEARCH</text>
+  <text x="536" y="230" fill="#f8fafc" font-family="Segoe UI, Aptos, sans-serif" font-size="72" font-weight="700">NeoPRISM<tspan fill="#7dd3fc">-AKI</tspan></text>
+  <text x="540" y="291" fill="#e2e8f0" font-family="Segoe UI, Aptos, sans-serif" font-size="29" font-weight="400">Configurable preprocessing · missingness views</text>
+  <text x="540" y="331" fill="#94a3b8" font-family="Segoe UI, Aptos, sans-serif" font-size="22" font-weight="400">Patient-level inputs · flexible model research</text>
+  <path d="M540 367 H1520" stroke="#334155" stroke-width="2"/>
+  <text x="540" y="410" fill="#2dd4bf" font-family="Segoe UI, Aptos, sans-serif" font-size="17" font-weight="700" letter-spacing="2">MODEL ROADMAP</text>
+  <text x="540" y="446" fill="#f1f5f9" font-family="Segoe UI, Aptos, sans-serif" font-size="22" font-weight="500">Multi-output perceptron · additional model families</text>
+  <text x="540" y="489" fill="#94a3b8" font-family="Segoe UI, Aptos, sans-serif" font-size="16" font-weight="600" letter-spacing="1.2">PREOPERATIVE  /  INTRAOPERATIVE  /  POSTOPERATIVE</text>
+  <text x="540" y="526" fill="#94a3b8" font-family="Segoe UI, Aptos, sans-serif" font-size="15" font-weight="600" letter-spacing="1.2">RESEARCH SOFTWARE · NOT FOR CLINICAL DECISION-MAKING</text>
 </svg>
