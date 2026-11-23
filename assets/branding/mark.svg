@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">NeoPRISM-AKI mark</title>
+  <desc id="desc">A connected N-shaped path with three nodes, representing a staged research workflow.</desc>
+  <rect width="512" height="512" rx="92" fill="#091721"/>
+  <rect x="16" y="16" width="480" height="480" rx="78" fill="none" stroke="#263c47" stroke-width="2"/>
+  <path d="M160 355 V157 L352 355 V157" fill="none" stroke="#63d8d2" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="160" cy="355" r="17" fill="#091721" stroke="#63d8d2" stroke-width="9"/>
+  <circle cx="256" cy="256" r="21" fill="#eef7f6" stroke="#091721" stroke-width="8"/>
+  <circle cx="352" cy="157" r="17" fill="#091721" stroke="#63d8d2" stroke-width="9"/>
+</svg>

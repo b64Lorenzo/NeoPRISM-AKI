@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="470" viewBox="0 0 1600 470" role="img" aria-labelledby="title desc">
+  <title id="title">NeoPRISM-AKI research workflow</title>
+  <desc id="desc">Five stages: local CSV inventory, configured phase-aware extraction, missingness plots and summaries, patient-level inputs, and a Rosenblatt perceptron baseline. Training requires clinically reviewed labels.</desc>
+  <rect width="1600" height="470" rx="18" fill="#0b1924"/>
+  <text x="64" y="66" fill="#eef7f6" font-family="Segoe UI, Aptos, sans-serif" font-size="27" font-weight="650">A transparent preprocessing-to-model workflow</text>
+  <text x="64" y="101" fill="#91aab4" font-family="Segoe UI, Aptos, sans-serif" font-size="17">Inspect the inputs and missingness before choosing how to model them.</text>
+  <path d="M168 205 H1432" fill="none" stroke="#38505a" stroke-width="3"/>
+  <g font-family="Segoe UI, Aptos, sans-serif" text-anchor="middle">
+    <circle cx="168" cy="205" r="26" fill="#0b1924" stroke="#63d8d2" stroke-width="3"/><text x="168" y="211" fill="#63d8d2" font-size="15" font-weight="700">01</text>
+    <circle cx="484" cy="205" r="26" fill="#0b1924" stroke="#63d8d2" stroke-width="3"/><text x="484" y="211" fill="#63d8d2" font-size="15" font-weight="700">02</text>
+    <circle cx="800" cy="205" r="26" fill="#0b1924" stroke="#63d8d2" stroke-width="3"/><text x="800" y="211" fill="#63d8d2" font-size="15" font-weight="700">03</text>
+    <circle cx="1116" cy="205" r="26" fill="#0b1924" stroke="#63d8d2" stroke-width="3"/><text x="1116" y="211" fill="#63d8d2" font-size="15" font-weight="700">04</text>
+    <circle cx="1432" cy="205" r="26" fill="#0b1924" stroke="#63d8d2" stroke-width="3"/><text x="1432" y="211" fill="#63d8d2" font-size="15" font-weight="700">05</text>
+  </g>
+  <g text-anchor="middle" font-family="Segoe UI, Aptos, sans-serif">
+    <text x="168" y="264" fill="#eaf3f2" font-size="17" font-weight="700" letter-spacing="1">CSV INVENTORY</text>
+    <text x="168" y="292" fill="#91aab4" font-size="15">Local source files</text>
+    <text x="484" y="264" fill="#eaf3f2" font-size="17" font-weight="700" letter-spacing="1">EXTRACT</text>
+    <text x="484" y="292" fill="#91aab4" font-size="15">Configured phases &amp; parameters</text>
+    <text x="800" y="264" fill="#eaf3f2" font-size="17" font-weight="700" letter-spacing="1">MISSINGNESS</text>
+    <text x="800" y="292" fill="#91aab4" font-size="15">Plots and summaries</text>
+    <text x="1116" y="264" fill="#eaf3f2" font-size="17" font-weight="700" letter-spacing="1">PATIENT INPUTS</text>
+    <text x="1116" y="292" fill="#91aab4" font-size="15">Reviewed labels or unlabeled rows</text>
+    <text x="1432" y="264" fill="#eaf3f2" font-size="17" font-weight="700" letter-spacing="1">MODEL BASELINE</text>
+    <text x="1432" y="292" fill="#91aab4" font-size="15">Rosenblatt perceptron</text>
+  </g>
+  <path d="M64 346 H1536" stroke="#263c47" stroke-width="2"/>
+  <circle cx="83" cy="393" r="7" fill="#63d8d2"/>
+  <text x="105" y="399" fill="#c1d0d4" font-family="Segoe UI, Aptos, sans-serif" font-size="16">Training requires a clinically reviewed label CSV; missing measurements are never treated as negative labels.</text>
+  <text x="1536" y="399" text-anchor="end" fill="#91aab4" font-family="Segoe UI, Aptos, sans-serif" font-size="14" letter-spacing="1">RESEARCH-ONLY</text>
+</svg>

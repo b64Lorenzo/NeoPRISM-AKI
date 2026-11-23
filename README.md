@@ -1,8 +1,14 @@
-# NeoPRISM-AKI — preprocessing, patient inputs, and Rosenblatt baseline
+# NeoPRISM-AKI
 
-Research-only Python pipeline for retrospective perioperative data. The project preserves the existing CSV inventory, phase-aware parameter extraction, derivation registry, plots and dashboards, and adds patient-level model inputs and a **binary Rosenblatt perceptron** baseline.
+[![Latest release](https://img.shields.io/github/v/release/b64Lorenzo/pattern-recognition-course)](https://github.com/b64Lorenzo/pattern-recognition-course/releases/latest)
+
+![NeoPRISM-AKI — perioperative research framework](assets/branding/banner.png)
+
+NeoPRISM-AKI is a research-only Python framework for retrospective perioperative data. It preserves configurable parameter extraction, phase-aware missingness views, patient-level model inputs, and a **binary Rosenblatt perceptron** baseline.
 
 **The project does not infer clinical AKI outcomes from missing measurements.** A clinically adjudicated label CSV is required for training. Unknown labels remain unknown and are excluded from training, never converted to No AKI. The model produces **hard class labels and uncalibrated linear scores**, not AKI risk probabilities. It is not a clinical decision-support system.
+
+![NeoPRISM-AKI preprocessing and model workflow](assets/branding/workflow.png)
 
 ## Quick start
 
@@ -22,7 +28,7 @@ uv run python -m pytest -q tests src/models/rosenblatt_perceptron/tests src/test
 6. Run `python -m src.cli rosenblatt-train --input results/inputsModel/patients_labeled.csv --output results/models/rosenblatt_perceptron`.
 7. For new patients, run `python -m src.cli inputs-model --config config/inputsModel.ini --unlabeled` on the new extraction directory, then `python -m src.cli rosenblatt-predict --model results/models/rosenblatt_perceptron/model.json --input results/inputsModel/patients_unlabeled.csv --output results/models/rosenblatt_perceptron/novel_predictions.csv`.
 
-See [model-input documentation](docs/model-inputs-and-labels.md), [model documentation](docs/rosenblatt-perceptron.md), [plotting documentation](docs/plotting-and-patient-dashboards.md), and [structure](docs/code-structure.md).
+See [model-input documentation](docs/model-inputs-and-labels.md), [model documentation](docs/rosenblatt-perceptron.md), [plotting documentation](docs/plotting-and-patient-dashboards.md), [release process](docs/release-process.md), and [project structure](docs/code-structure.md).
 
 ## Research safeguards
 

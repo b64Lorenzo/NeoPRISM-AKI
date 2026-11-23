@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="560" viewBox="0 0 1600 560" role="img" aria-labelledby="title desc">
+  <title id="title">NeoPRISM-AKI perioperative research framework</title>
+  <desc id="desc">A dark, restrained banner introducing configurable extraction, missingness views, and patient-level model inputs. Research software only.</desc>
+  <rect width="1600" height="560" fill="#091721"/>
+  <path d="M480 76 V484" stroke="#263c47" stroke-width="2"/>
+  <svg x="72" y="92" width="360" height="360" viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="92" fill="#0e202b"/>
+    <rect x="16" y="16" width="480" height="480" rx="78" fill="none" stroke="#263c47" stroke-width="2"/>
+    <path d="M160 355 V157 L352 355 V157" fill="none" stroke="#63d8d2" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="160" cy="355" r="17" fill="#0e202b" stroke="#63d8d2" stroke-width="9"/>
+    <circle cx="256" cy="256" r="21" fill="#eef7f6" stroke="#0e202b" stroke-width="8"/>
+    <circle cx="352" cy="157" r="17" fill="#0e202b" stroke="#63d8d2" stroke-width="9"/>
+  </svg>
+  <text x="530" y="151" fill="#91aab4" font-family="Segoe UI, Aptos, sans-serif" font-size="17" font-weight="600" letter-spacing="3">PERIOPERATIVE RESEARCH  /  RELEASE 0.1.0</text>
+  <text x="525" y="242" fill="#f0f6f5" font-family="Segoe UI, Aptos, sans-serif" font-size="70" font-weight="700">NeoPRISM<tspan fill="#63d8d2">-AKI</tspan></text>
+  <text x="530" y="294" fill="#d8e4e5" font-family="Segoe UI, Aptos, sans-serif" font-size="28" font-weight="400">Configurable perioperative AKI research framework</text>
+  <text x="530" y="333" fill="#91aab4" font-family="Segoe UI, Aptos, sans-serif" font-size="21" font-weight="400">Parameter extraction · missingness plots · patient-level model inputs</text>
+  <path d="M530 371 H1518" stroke="#263c47" stroke-width="2"/>
+  <g font-family="Segoe UI, Aptos, sans-serif" font-size="18" font-weight="650" letter-spacing="1.5">
+    <text x="530" y="423" fill="#63d8d2">01</text><text x="568" y="423" fill="#e3ecec">EXTRACT</text>
+    <text x="820" y="423" fill="#63d8d2">02</text><text x="858" y="423" fill="#e3ecec">EXPLORE</text>
+    <text x="1110" y="423" fill="#63d8d2">03</text><text x="1148" y="423" fill="#e3ecec">MODEL</text>
+  </g>
+  <text x="530" y="493" fill="#91aab4" font-family="Segoe UI, Aptos, sans-serif" font-size="16" font-weight="600" letter-spacing="1.2">RESEARCH SOFTWARE · NOT FOR CLINICAL DECISION-MAKING</text>
+</svg>

@@ -1,7 +1,7 @@
 [project]
 name = "aki-pipeline"
 version = "0.1.0"
-description = "Clinical parameter extraction and preprocessing pipeline"
+description = "Research-only perioperative AKI preprocessing and model-baseline framework"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "matplotlib>=3.11.2",
