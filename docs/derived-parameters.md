@@ -1,6 +1,6 @@
 # Extensible derived parameters
 
-The extractor supports **deterministic patient-local derivations**. This is distinct from statistical imputation (median/KNN/MICE), which would require fitting on training patients only. The design follows the observed-first BMI behavior documented in the [reference project](https://github.com/b64Lorenzo/pattern-recognition-course/blob/main/docs/preoperative-parameters.md), but uses a registry to add new calculations without editing the extractor.
+The extractor supports **deterministic patient-local derivations**. This is distinct from statistical imputation (median/KNN/MICE), which would require fitting on training patients only. The design follows the observed-first BMI behavior documented in the [reference project](https://github.com/b64Lorenzo/NeoPRISM-AKI/blob/xml_version/docs/preoperative-parameters.md), but uses a registry to add new calculations without editing the extractor.
 
 ## Architecture
 

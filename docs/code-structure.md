@@ -1,6 +1,6 @@
 # Code structure
 
-The `src/` package separates input inventory, clinical extraction and visualization. This follows the **component-owned responsibility** idea described in the reference repository's [code-structure guide](https://github.com/b64Lorenzo/pattern-recognition-course/blob/main/docs/code-structure.md), but this project uses discrete CLI commands and INI configuration rather than XML stage orchestration.
+The `src/` package separates input inventory, clinical extraction and visualization. This follows the **component-owned responsibility** idea described in the reference repository's [code-structure guide](https://github.com/b64Lorenzo/NeoPRISM-AKI/blob/xml_version/docs/code-structure.md), but this project uses discrete CLI commands and INI configuration rather than XML stage orchestration.
 
 ```text
 src/

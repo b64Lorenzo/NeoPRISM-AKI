@@ -1,6 +1,6 @@
 # NeoPRISM-AKI
 
-[![Latest release](https://img.shields.io/github/v/release/b64Lorenzo/pattern-recognition-course)](https://github.com/b64Lorenzo/pattern-recognition-course/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/b64Lorenzo/NeoPRISM-AKI)](https://github.com/b64Lorenzo/NeoPRISM-AKI/releases/latest)
 
 ![NeoPRISM-AKI prism banner — preprocessing, missingness analysis, and model roadmap](assets/branding/banner.png)
 
