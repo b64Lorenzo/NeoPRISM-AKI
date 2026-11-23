@@ -11,4 +11,11 @@ results/
 .vs/
 data/patients/*
 !data/patients/README.md
+data/labels/*.csv
+!data/labels/*.example.csv
+
+# Local clinical source mappings and label settings
+/config/parameters.ini
+/config/plotting.ini
+/config/inputsModel.ini
 .DS_Store

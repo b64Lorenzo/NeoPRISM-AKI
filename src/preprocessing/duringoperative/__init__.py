@@ -1,1 +1,0 @@
-"""Duringoperative components."""

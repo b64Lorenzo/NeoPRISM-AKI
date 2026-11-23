@@ -1,42 +1,40 @@
-# Pattern Recognition
+# NeoPRISM-AKI — preprocessing, patient inputs, and Rosenblatt baseline
 
-Course project for a configurable patient-CSV workflow: optionally extract pre-operative features and postoperative labels, then run zero or more model instances (currently the perceptron baseline) against their configured clean-data inputs.
+Research-only Python pipeline for retrospective perioperative data. The project preserves the existing CSV inventory, phase-aware parameter extraction, derivation registry, plots and dashboards, and adds patient-level model inputs and a **binary Rosenblatt perceptron** baseline.
+
+**The project does not infer clinical AKI outcomes from missing measurements.** A clinically adjudicated label CSV is required for training. Unknown labels remain unknown and are excluded from training, never converted to No AKI. The model produces **hard class labels and uncalibrated linear scores**, not AKI risk probabilities. It is not a clinical decision-support system.
 
 ## Quick start
 
-Requires Python 3.10 or newer.
+From the project root with Python 3.12 or 3.13 and [uv](https://docs.astral.sh/uv/):
 
-```powershell
-py -3 -m pip install -r requirements.txt
-py -3 -m unittest discover -s tests -v
-py -3 -m src.cli --help
+```bash
+uv sync --group dev
+uv run python -m src.cli --help
+uv run python -m pytest -q tests src/models/rosenblatt_perceptron/tests src/tests
 ```
 
-## Run the pipeline
+1. Keep your existing `config/parameters.ini` and `config/plotting.ini`; merge the supplied `*.additions.ini` snippets without duplicate section headers.
+2. Run parameter extraction to populate `results/parameters/{preoperative,intraoperative,postoperative}/ref_*.csv`.
+3. Copy `config/inputsModel.example.ini` to `config/inputsModel.ini`, and edit the exact `phase/parameter_id` features to match your parameter catalog.
+4. Create a clinically reviewed label CSV with `patient_id,aki_label` as documented in [model inputs and labels](docs/model-inputs-and-labels.md). Missing outcomes remain unknown, never negative.
+5. Run `python -m src.cli inputs-model --config config/inputsModel.ini`.
+6. Run `python -m src.cli rosenblatt-train --input results/inputsModel/patients_labeled.csv --output results/models/rosenblatt_perceptron`.
+7. For new patients, run `python -m src.cli inputs-model --config config/inputsModel.ini --unlabeled` on the new extraction directory, then `python -m src.cli rosenblatt-predict --model results/models/rosenblatt_perceptron/model.json --input results/inputsModel/patients_unlabeled.csv --output results/models/rosenblatt_perceptron/novel_predictions.csv`.
 
-Before running the active configuration, review `config/pipeline.xml`: enabled preprocessing or model inputs may refer to an external cohort or clean-data files. The disabled `config/pipeline.template.xml` is the starter. Pipeline XML version 2 allows preprocessing and the model collection to be omitted; each model instance owns its input paths and feature schema, and an empty model collection is a valid no-model run. Keep cohort inputs, patient-level outputs, and logs in approved storage; default output folders are ignored by Git, but custom folders may not be.
+See [model-input documentation](docs/model-inputs-and-labels.md), [model documentation](docs/rosenblatt-perceptron.md), [plotting documentation](docs/plotting-and-patient-dashboards.md), and [structure](docs/code-structure.md).
 
-```powershell
-py -3 -m src.cli run --config config/pipeline.xml
+## Research safeguards
+
+- All features are explicitly selected by phase; postoperative observations must not be used as predictors for postoperative AKI.
+- For preoperative prediction select only preoperative features. End-of-surgery predictors may include intraoperative summaries available by surgery end. `operation_duration` is **not** available before operation end.
+- For sequential snapshots, specify `cutoff_minutes` and use only observations genuinely available by the cutoff; extraction timestamps alone may not capture laboratory reporting delay.
+- Patients are split before feature preprocessing. Numeric imputation/standardisation and categorical vocabularies are learned from training patients only.
+- The split is patient-disjoint and stratified when each class has at least two patients. External validation, confidence intervals, calibration, temporal drift and outcome adjudication are still needed.
+- CSVs and `split.json` contain patient identifiers: store them in approved locations, not a public Git repository. Model JSON contains weights and preprocessing statistics, but no patient identifiers.
+
+## Tests
+
+```bash
+python -m pytest -q tests src/models/rosenblatt_perceptron/tests src/tests
 ```
-
-The CLI has one subcommand, `run`; `--config` selects the XML pipeline configuration. Extraction, plotting, and model stages are controlled in that XML rather than through separate CLI commands. See the [XML pipeline guide](docs/xml-pipeline-configuration.md) for version 1 migration details and configuration examples.
-
-## Project guides
-
-| Topic | Guide |
-|---|---|
-| Patient CSV extraction and outputs | [CSV extraction](docs/data-extraction.md) |
-| Patient grouping, vectors, and artifacts | [Patient-vector workflow](docs/patient-vectors.md) |
-| Feature definitions and BMI | [Pre-operative parameters](docs/preoperative-parameters.md) |
-| Outcome evidence and limitations | [Post-operative outcomes](docs/postoperative-outcomes.md) |
-| Training and validation | [Perceptron guide](docs/perceptron-training.md) |
-| Edit and validate the parameter catalog | [XML parameter map](docs/parameter-map-xml.md) |
-| Pipeline stages, settings, and migration | [XML pipeline configuration](docs/xml-pipeline-configuration.md) |
-| Packages and extension points | [Code structure](docs/code-structure.md) |
-
-On Windows, XML Notepad is an optional XML editor; installation and validation steps are in the [parameter-map guide](docs/parameter-map-xml.md). Original project code and documentation are MIT-licensed; course materials, datasets, and third-party content retain their own terms ([notices](THIRD_PARTY_NOTICES.md)).
-
-## AI use notice
-
-Code autocompletion is used. AI may assist with writing tests and documentation. Authors are responsible for reviewing and validating all submitted work.

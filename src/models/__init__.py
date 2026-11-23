@@ -1,1 +1,1 @@
-"""Model utilities for the pipeline."""
+"""NeoPRISM predictive models (outside preprocessing)."""

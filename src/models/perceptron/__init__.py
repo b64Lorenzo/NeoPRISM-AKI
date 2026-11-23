@@ -1,1 +1,0 @@
-"Perceptron model implementation."

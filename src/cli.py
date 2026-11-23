@@ -1,68 +1,59 @@
-"""Command-line entry point for the local CSV analysis PoC."""
+
+"""Main command-line interface for the AKI/KDIGO pipeline."""
 
 from __future__ import annotations
 
 import argparse
 import csv
 import sys
-from pathlib import Path
 
-from src.logging.logger import Logger, LogLevel
-from src.pipeline.runner import run_pipeline
-
-ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_PARAMETER_MAP = ROOT / "config" / "pipeline.xml"
-DEFAULT_PIPELINE_CONFIG = ROOT / "config" / "pipeline.xml"
-
-
-def _values(value: str) -> tuple[str, ...]:
-    values = tuple(item.strip() for item in value.split(",") if item.strip())
-    if not values:
-        raise argparse.ArgumentTypeError("provide at least one comma-separated value")
-    return values
+from src.preprocessing.csv_header.run import register_parser as register_csv_header
+from src.preprocessing.parameters.run import (
+    register_parser as register_parameters,
+)
+from src.preprocessing.plotting.run import (
+    register_parser as register_plotting,
+)
+from src.preprocessing.inputsModel.run import register_parser as register_inputs_model
+from src.models.rosenblatt_perceptron.run import register_parser as register_rosenblatt
+from src.utils.logger import log
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pattern-recognition",
-        description="Build one pre-operative feature vector per patient CSV and assess outcomes from post-operative data.",
+        description="AKI/KDIGO prediction pipeline.",
     )
-    commands = parser.add_subparsers(dest="command", required=True)
-    common = argparse.ArgumentParser(add_help=False)
 
-    run = commands.add_parser("run", help="run configured preprocessing and model stages from XML")
-    run.add_argument("--config", type=Path, default=DEFAULT_PIPELINE_CONFIG, help="XML run configuration")
+    commands = parser.add_subparsers(
+        dest="command",
+        required=True,
+    )
+
+    register_csv_header(commands)
+    register_parameters(commands)
+    register_plotting(commands)
+    register_inputs_model(commands)
+    register_rosenblatt(commands)
 
     return parser
-
-
-def _positive_int(value: str) -> int:
-    try:
-        parsed = int(value)
-    except ValueError as error:
-        raise argparse.ArgumentTypeError("must be a positive integer") from error
-    if parsed < 1:
-        raise argparse.ArgumentTypeError("must be a positive integer")
-    return parsed
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+
     try:
-        if args.command == "run":
-            message = run_pipeline(args.config)
-            return 0
+        log("INFO", "cli", f"Starting command: {args.command}")
+
+        result = args.handler(args)
+
+        log("INFO", "cli", f"Completed command: {args.command}")
+        return 0 if result is None else result
+
     except (csv.Error, OSError, ValueError, RuntimeError) as error:
-        detail = str(error) if isinstance(error, (ValueError, RuntimeError)) else "check inputs, mapping, and dependencies"
-        error_message = f"Command failed ({type(error).__name__}): {detail}"
-        error_log_dir = getattr(args, "log_dir", ROOT / "logs")
-        try:
-            with Logger(minimum_level=LogLevel.ERROR, log_root=error_log_dir) as logger:
-                logger.write(LogLevel.ERROR, "cli", error_message)
-        except OSError:
-            pass
-        print(error_message, file=sys.stderr)
+        log("ERROR", "cli", f"{type(error).__name__}: {error}")
+        print(f"Error: {error}", file=sys.stderr)
         return 2
 
 
