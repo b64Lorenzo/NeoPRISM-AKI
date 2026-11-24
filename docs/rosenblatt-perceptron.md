@@ -16,7 +16,7 @@ For transformed vector `x`, the linear score is `s(x) = w·x + b`, with predicti
 python -m src.cli rosenblatt-train --input results/inputsModel/patients_labeled.csv --output results/models/rosenblatt_perceptron --train-fraction 0.8 --seed 2026 --max-epochs 100
 ```
 
-Unknown labels are excluded; both classes need at least two patients for a stratified holdout. Training-only numeric median imputation and standardisation, categorical one-hot encoding and missingness indicators are stored in `model.json`. Outputs include `split.json` (sensitive IDs), `validation/predictions.csv`, `validation/metrics.json`, `validation/confusion_matrix.csv`, and optionally `validation/confusion_matrix.png` when matplotlib is installed.
+Unknown labels are excluded; both classes need at least two patients for a stratified holdout. Training-only numeric median imputation and standardisation, categorical one-hot encoding and missingness indicators are stored in `model.json`. Outputs include `split.json` (sensitive IDs), `validation/predictions.csv`, `validation/metrics.json`, `validation/confusion_matrix.csv`, `validation/confusion_matrix.html` (self-contained interactive Plotly), and optionally `validation/confusion_matrix.png` when matplotlib is installed. The confusion-matrix implementation is shared with other classifiers through `src/models/evaluation/`.
 
 The confusion matrix rows are true labels, columns predicted labels, in order `[-1,+1]`:
 
@@ -37,4 +37,4 @@ The inference command loads a frozen JSON model and its training-fitted feature 
 
 ## References and limitations
 
-Implementation is adapted conceptually from the user's Rosenblatt assignment (https://github.com/b64Lorenzo/nnci-course-python) and the modular `prism-ml` package (https://github.com/b64Lorenzo/neoprism), rather than a verbatim copy. The baseline is binary; four-stage KDIGO classification, probabilistic logistic regression, group-aware repeated-episode splitting, calibration and dynamic risk prediction are future extensions.
+Implementation is adapted conceptually from the user's Rosenblatt assignment (https://github.com/b64Lorenzo/nnci-course-python) and the modular `prism-ml` package (https://github.com/b64Lorenzo/neoprism), rather than a verbatim copy. The baseline remains binary. Four-stage classification is available in the separate logistic-regression and MLP packages; see [classification models](classification-models.md). Group-aware repeated-episode splitting, calibration and dynamic risk prediction remain future extensions.

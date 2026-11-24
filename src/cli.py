@@ -1,4 +1,3 @@
-
 """Main command-line interface for the AKI/KDIGO pipeline."""
 
 from __future__ import annotations
@@ -7,15 +6,17 @@ import argparse
 import csv
 import sys
 
+from src.models.rosenblatt_perceptron.run import register_parser as register_rosenblatt
+from src.models.run import register_parser as register_classifiers
+from src.pipeline.run import register_parser as register_pipeline
 from src.preprocessing.csv_header.run import register_parser as register_csv_header
+from src.preprocessing.inputsModel.run import register_parser as register_inputs_model
 from src.preprocessing.parameters.run import (
     register_parser as register_parameters,
 )
 from src.preprocessing.plotting.run import (
     register_parser as register_plotting,
 )
-from src.preprocessing.inputsModel.run import register_parser as register_inputs_model
-from src.models.rosenblatt_perceptron.run import register_parser as register_rosenblatt
 from src.utils.logger import log
 
 
@@ -35,6 +36,8 @@ def build_parser() -> argparse.ArgumentParser:
     register_plotting(commands)
     register_inputs_model(commands)
     register_rosenblatt(commands)
+    register_classifiers(commands)
+    register_pipeline(commands)
 
     return parser
 

@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="unqualified">
+  <xs:annotation><xs:documentation>
+    Optional orchestration around existing domain INIs. Runtime validation also
+    enforces plugin options, target compatibility, and enabled-output uniqueness.
+  </xs:documentation></xs:annotation>
+
+  <xs:simpleType name="NonEmptyText">
+    <xs:annotation><xs:documentation>A nonblank path, column name, or option value.</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:token"><xs:minLength value="1"/></xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ModelIdentifier">
+    <xs:annotation><xs:documentation>Unique human-readable model entry identifier.</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:token"><xs:pattern value="[A-Za-z_][A-Za-z0-9_.\-]*"/></xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RegistryToken">
+    <xs:annotation><xs:documentation>Extensible model type or Python-style option name; runtime requires registration.</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:token"><xs:pattern value="[a-z][a-z0-9_]*"/></xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TrainFraction">
+    <xs:annotation><xs:documentation>Training fraction strictly between zero and one.</xs:documentation></xs:annotation>
+    <xs:restriction base="xs:double"><xs:minExclusive value="0"/><xs:maxExclusive value="1"/></xs:restriction>
+  </xs:simpleType>
+
+  <xs:complexType name="Extraction">
+    <xs:annotation><xs:documentation>Parameter extraction; XML explicitly owns input and output paths.</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="input" type="NonEmptyText" maxOccurs="unbounded">
+        <xs:annotation><xs:documentation>CSV file or directory, relative to the XML file unless absolute.</xs:documentation></xs:annotation>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="config" type="NonEmptyText" use="required"/>
+    <xs:attribute name="outputDir" type="NonEmptyText" use="required"/>
+    <xs:attribute name="run" type="xs:boolean" default="false"/>
+  </xs:complexType>
+  <xs:complexType name="Plotting">
+    <xs:annotation><xs:documentation>Existing plotting command; its INI owns plotting paths and settings.</xs:documentation></xs:annotation>
+    <xs:attribute name="config" type="NonEmptyText" use="required"/>
+    <xs:attribute name="run" type="xs:boolean" default="false"/>
+  </xs:complexType>
+  <xs:complexType name="InputsModel">
+    <xs:annotation><xs:documentation>Existing matrix builder; its INI owns features, labels, and paths.</xs:documentation></xs:annotation>
+    <xs:attribute name="config" type="NonEmptyText" use="required"/>
+    <xs:attribute name="run" type="xs:boolean" default="false"/>
+    <xs:attribute name="unlabeled" type="xs:boolean" default="false"/>
+  </xs:complexType>
+  <xs:complexType name="Preprocessing">
+    <xs:annotation><xs:documentation>Optional stages in execution order: extraction, plotting, then matrix building.</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="extraction" type="Extraction" minOccurs="0">
+        <xs:annotation><xs:documentation>Extract configured parameters using the existing parameter INI.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="plotting" type="Plotting" minOccurs="0">
+        <xs:annotation><xs:documentation>Generate the plots enabled in the plotting INI.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="inputsModel" type="InputsModel" minOccurs="0">
+        <xs:annotation><xs:documentation>Build a labeled or feature-only matrix using the existing input-model INI.</xs:documentation></xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="Features">
+    <xs:annotation><xs:documentation>Explicit ordered matrix columns; the target must not be included.</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="column" type="NonEmptyText" maxOccurs="unbounded">
+        <xs:annotation><xs:documentation>An exact feature-column header in this model's matrix.</xs:documentation></xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="Split">
+    <xs:annotation><xs:documentation>Explicit holdout split settings owned by this model.</xs:documentation></xs:annotation>
+    <xs:attribute name="trainFraction" type="TrainFraction" use="required"/>
+    <xs:attribute name="seed" type="xs:nonNegativeInteger" use="required"/>
+  </xs:complexType>
+  <xs:complexType name="Options">
+    <xs:annotation><xs:documentation>Plugin-specific name/value settings; runtime parses and validates their types.</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="option" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation><xs:documentation>A Python option name and nonblank value, unique within this model.</xs:documentation></xs:annotation>
+        <xs:complexType>
+          <xs:attribute name="name" type="RegistryToken" use="required"/>
+          <xs:attribute name="value" type="NonEmptyText" use="required"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="Model">
+    <xs:annotation><xs:documentation>Independent train/evaluate entry; no paths or feature schema are inherited.</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="inputMatrix" type="NonEmptyText">
+        <xs:annotation><xs:documentation>Model-input CSV path; existence is checked after preprocessing.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="outputDir" type="NonEmptyText">
+        <xs:annotation><xs:documentation>Output directory, distinct from other enabled model output directories.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="targetColumn" type="NonEmptyText">
+        <xs:annotation><xs:documentation>Target header; built-ins accept aki_label, or aki_stage where supported.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="features" type="Features">
+        <xs:annotation><xs:documentation>One or more exact, unique feature headers in declared order.</xs:documentation></xs:annotation>
+        <xs:unique name="UniqueFeatureColumns"><xs:selector xpath="column"/><xs:field xpath="."/></xs:unique>
+      </xs:element>
+      <xs:element name="split" type="Split">
+        <xs:annotation><xs:documentation>Required training fraction and random seed.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="options" type="Options">
+        <xs:annotation><xs:documentation>Required container; may be empty to use the model parser's defaults.</xs:documentation></xs:annotation>
+        <xs:unique name="UniqueOptionNames"><xs:selector xpath="option"/><xs:field xpath="@name"/></xs:unique>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="id" type="ModelIdentifier" use="required"/>
+    <xs:attribute name="type" type="RegistryToken" use="required"/>
+    <xs:attribute name="run" type="xs:boolean" default="false"/>
+  </xs:complexType>
+  <xs:complexType name="Models">
+    <xs:annotation><xs:documentation>Ordered entries; repeated model types are allowed, and an empty collection is valid.</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="model" type="Model" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation><xs:documentation>An independently configured model invocation.</xs:documentation></xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="Pipeline">
+    <xs:annotation><xs:documentation>Optional preprocessing followed by optional independent models.</xs:documentation></xs:annotation>
+    <xs:sequence>
+      <xs:element name="preprocessing" type="Preprocessing" minOccurs="0">
+        <xs:annotation><xs:documentation>INI-backed preprocessing; no automatic propagation of output paths.</xs:documentation></xs:annotation>
+      </xs:element>
+      <xs:element name="models" type="Models" minOccurs="0">
+        <xs:annotation><xs:documentation>Models run sequentially in document order after preprocessing.</xs:documentation></xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="pipelineConfiguration" type="Pipeline">
+    <xs:annotation><xs:documentation>Pipeline document root. All run switches default to false.</xs:documentation></xs:annotation>
+    <xs:unique name="UniqueModelIds"><xs:selector xpath="models/model"/><xs:field xpath="@id"/></xs:unique>
+  </xs:element>
+</xs:schema>

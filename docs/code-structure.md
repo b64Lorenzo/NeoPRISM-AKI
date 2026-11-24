@@ -1,6 +1,6 @@
 # Code structure
 
-The `src/` package separates input inventory, clinical extraction and visualization. This follows the **component-owned responsibility** idea described in the reference repository's [code-structure guide](https://github.com/b64Lorenzo/NeoPRISM-AKI/blob/xml_version/docs/code-structure.md), but this project uses discrete CLI commands and INI configuration rather than XML stage orchestration.
+The `src/` package separates input inventory, clinical extraction, visualization and models. Existing commands retain their INI configuration. The optional `src/pipeline/` XML layer orchestrates those components without duplicating their algorithms or migrating their catalogs.
 
 ```text
 src/
@@ -53,7 +53,7 @@ flowchart TD
 
 ### Command contracts
 
-`parameters-extraction` takes raw patient CSV files and produces clinical observations and metadata. `plotting` consumes the extracted directory, **not** the raw Epic CSV. To change boundary phrases, rerun extraction before plotting. The current source declares CLI entrypoints under `src.cli`; no XML configuration is read.
+`parameters-extraction` takes raw patient CSV files and produces clinical observations and metadata. `plotting` consumes the extracted directory, **not** the raw Epic CSV. To change boundary phrases, rerun extraction before plotting. The current source declares CLI entrypoints under `src.cli`; `pipeline --config config/pipeline.xml` optionally coordinates the same stage functions. Paths in XML are relative to its directory; paths inside referenced INIs retain their existing semantics.
 
 ### Test conventions
 
@@ -68,4 +68,22 @@ Plotting's `config.py` reads `[value_heatmaps] parameter_ids`, while `run.py` in
 
 ## Added model packages
 
-`src/preprocessing/inputsModel/` builds one-row-per-patient matrices and reads independently adjudicated AKI labels. `src/models/rosenblatt_perceptron/` holds the model, training, validation, tests and novel-data execution. The CLI exposes `inputs-model`, `rosenblatt-train` and `rosenblatt-predict`. See `docs/model-inputs-and-labels.md` and `docs/rosenblatt-perceptron.md`.
+`src/preprocessing/inputsModel/` builds one-row-per-patient matrices and reads independently adjudicated AKI labels. `src/models/rosenblatt_perceptron/` holds the binary baseline and preserves its existing artifacts and commands.
+
+```text
+src/models/
+  contracts.py                   # Shared feature/target/activation contracts
+  data.py                        # Patient matrices, stratified splits and frozen transforms
+  classification.py              # Shared train/evaluate/save/load/predict orchestration
+  evaluation/                    # Binary/multiclass confusion matrices and reports
+  neural_network/                 # activation_func.py, nnUtils.py, nnClass.py (MLP)
+  logistic_regression/            # Regularized multinomial softmax model
+  rosenblatt_perceptron/          # Existing binary baseline
+  run.py                         # Logistic/MLP CLI registration
+src/pipeline/
+  config.py                      # Strict XML parsing, typed stage/model configuration
+  registry.py                    # Extensible option-parser/runner pairs
+  run.py                         # Ordered execution and pipeline CLI registration
+```
+
+See [classification models](classification-models.md), [XML pipeline](xml-pipeline.md), and [Rosenblatt perceptron](rosenblatt-perceptron.md).

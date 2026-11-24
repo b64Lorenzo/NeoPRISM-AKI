@@ -4,9 +4,9 @@
 
 ![NeoPRISM-AKI prism banner — preprocessing, missingness analysis, and model roadmap](assets/branding/banner.png)
 
-NeoPRISM-AKI is a research-only Python framework for retrospective perioperative data. It currently provides configurable parameter extraction, phase-aware missingness views, patient-level model inputs, and a **binary Rosenblatt perceptron** baseline. Planned model extensions include a multi-output perceptron and additional model families.
+NeoPRISM-AKI is a research-only Python framework for retrospective perioperative data. It provides configurable parameter extraction, phase-aware missingness views, patient-level model inputs, a **binary Rosenblatt perceptron**, **multinomial logistic regression**, and a **multilayer perceptron (MLP)**. An optional XML pipeline runs configured stages and models without replacing the existing INI catalogs or standalone commands.
 
-**The project does not infer clinical AKI outcomes from missing measurements.** A clinically adjudicated label CSV is required for training. Unknown labels remain unknown and are excluded from training, never converted to No AKI. The model produces **hard class labels and uncalibrated linear scores**, not AKI risk probabilities. It is not a clinical decision-support system.
+**The project does not infer clinical AKI outcomes from missing measurements.** A clinically adjudicated label CSV is required for training. Unknown labels remain unknown and are excluded from training, never converted to No AKI. The Rosenblatt model produces **hard class labels and uncalibrated linear scores**, not AKI risk probabilities. Logistic regression and the MLP produce class probabilities that still require out-of-sample calibration and clinical validation. It is not a clinical decision-support system.
 
 ![NeoPRISM-AKI preprocessing and model workflow](assets/branding/workflow.png)
 
@@ -29,6 +29,16 @@ uv run python -m pytest -q tests src/models/rosenblatt_perceptron/tests src/test
 7. For new patients, run `python -m src.cli inputs-model --config config/inputsModel.ini --unlabeled` on the new extraction directory, then `python -m src.cli rosenblatt-predict --model results/models/rosenblatt_perceptron/model.json --input results/inputsModel/patients_unlabeled.csv --output results/models/rosenblatt_perceptron/novel_predictions.csv`.
 
 See [model-input documentation](docs/model-inputs-and-labels.md), [model documentation](docs/rosenblatt-perceptron.md), [plotting documentation](docs/plotting-and-patient-dashboards.md), [release process](docs/release-process.md), and [project structure](docs/code-structure.md).
+
+## Additional models and XML pipeline
+
+```bash
+uv run python -m src.cli logistic-train --input results/inputsModel/patients_labeled.csv --output results/models/logistic_regression --l2 0.01
+uv run python -m src.cli mlp-train --input results/inputsModel/patients_labeled.csv --output results/models/multilayer_perceptron --hidden-layers 16 8
+uv run python -m src.cli pipeline --config config/pipeline.xml
+```
+
+The checked-in XML files have every stage disabled: edit explicit paths, feature columns and `run` flags before use. XML coordinates existing INI-configured preprocessing and independent model entries. See [classification models and reusable confusion matrices](docs/classification-models.md) and [XML configuration/extension guide](docs/xml-pipeline.md). Use `--target-column aki_stage` on either new training command for four-stage classification; the default remains binary `aki_label`.
 
 ## Research safeguards
 

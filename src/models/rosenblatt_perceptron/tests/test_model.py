@@ -1,9 +1,11 @@
 import csv
 import json
+
 from src.models.rosenblatt_perceptron.core import train
-from src.models.rosenblatt_perceptron.training import fit
 from src.models.rosenblatt_perceptron.execution.predict import predict_csv
-from src.models.rosenblatt_perceptron.validation.metrics import evaluate,auc
+from src.models.rosenblatt_perceptron.training import fit
+from src.models.rosenblatt_perceptron.validation.metrics import auc, evaluate
+
 
 def test_linearly_separable():
     model,info=train([[2,1],[-2,-1],[3,1],[-3,-1]],[1,-1,1,-1],epochs=100)
@@ -28,6 +30,11 @@ def test_pipeline_and_novel_inference(tmp_path):
     ids=json.loads((out/'split.json').read_text())
     assert not set(ids['training_patient_ids'])&set(ids['validation_patient_ids'])
     assert (out/'validation'/'metrics.json').exists()
+    assert (out/'validation'/'confusion_matrix.html').is_file()
+    with (out/'validation'/'confusion_matrix.csv').open(newline='') as stream:
+        confusion = list(csv.reader(stream))
+    assert confusion[0] == ['true/predicted', 'No AKI (-1)', 'AKI (+1)']
+    assert sum(int(value) for row in confusion[1:] for value in row[1:]) == len(ids['validation_patient_ids'])
     novel=tmp_path/'novel.csv'
     with novel.open('w',newline='') as f:
         w=csv.writer(f);w.writerow(['patient_id','preoperative/age','preoperative/sex'])

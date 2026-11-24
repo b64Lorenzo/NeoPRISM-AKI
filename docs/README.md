@@ -8,3 +8,5 @@
 ## Model pipeline
 - [Patient-level model inputs and labels](model-inputs-and-labels.md)
 - [Binary Rosenblatt perceptron](rosenblatt-perceptron.md)
+- [Logistic regression, MLP and shared evaluation](classification-models.md)
+- [XML pipeline and extension guide](xml-pipeline.md)

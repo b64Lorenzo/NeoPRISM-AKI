@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pipelineConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                       xsi:noNamespaceSchemaLocation="pipeline.xsd">
+  <!-- Safe starter: nothing runs until its own run flag is enabled.
+       XML paths are relative to this directory; INI-internal paths keep their
+       existing meaning. Edit the referenced example INIs before enabling.
+       Replace feature_1/feature_2 with exact headers in each model's matrix. -->
+  <preprocessing>
+    <extraction run="false" config="parameters.example.ini" outputDir="../results/parameters">
+      <input>../data/example.csv</input>
+    </extraction>
+    <plotting run="false" config="plotting.example.ini"/>
+    <inputsModel run="false" config="inputsModel.example.ini" unlabeled="false"/>
+  </preprocessing>
+  <models>
+    <model id="rosenblatt_baseline" type="rosenblatt_perceptron" run="false">
+      <inputMatrix>../results/inputsModel/patients_labeled.csv</inputMatrix>
+      <outputDir>../results/models/rosenblatt_baseline</outputDir>
+      <targetColumn>aki_label</targetColumn>
+      <features><column>feature_1</column><column>feature_2</column></features>
+      <split trainFraction="0.8" seed="2026"/>
+      <options>
+        <option name="epochs" value="100"/>
+        <!-- Omit learning_rate to retain the legacy automatically chosen rate. -->
+        <option name="threshold" value="0"/>
+      </options>
+    </model>
+    <model id="logistic_baseline" type="logistic_regression" run="false">
+      <inputMatrix>../results/inputsModel/patients_labeled.csv</inputMatrix>
+      <outputDir>../results/models/logistic_baseline</outputDir>
+      <targetColumn>aki_label</targetColumn>
+      <features><column>feature_1</column><column>feature_2</column></features>
+      <split trainFraction="0.8" seed="2026"/>
+      <options>
+        <option name="epochs" value="1000"/>
+        <option name="learning_rate" value="0.05"/>
+        <option name="batch_size" value="32"/>
+        <option name="tolerance" value="0"/>
+        <option name="l2" value="0"/>
+      </options>
+    </model>
+    <model id="mlp_baseline" type="multilayer_perceptron" run="false">
+      <inputMatrix>../results/inputsModel/patients_labeled.csv</inputMatrix>
+      <outputDir>../results/models/mlp_baseline</outputDir>
+      <targetColumn>aki_label</targetColumn>
+      <features><column>feature_1</column><column>feature_2</column></features>
+      <split trainFraction="0.8" seed="2026"/>
+      <options>
+        <option name="epochs" value="1000"/>
+        <option name="learning_rate" value="0.05"/>
+        <option name="batch_size" value="32"/>
+        <option name="tolerance" value="0"/>
+        <option name="hidden_layers" value="16"/>
+        <option name="activation" value="relu"/>
+      </options>
+    </model>
+  </models>
+</pipelineConfiguration>
