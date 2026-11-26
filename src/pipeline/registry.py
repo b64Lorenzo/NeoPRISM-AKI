@@ -5,12 +5,13 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from types import MappingProxyType
 
 from src.models.contracts import HIDDEN_ACTIVATIONS, is_forbidden_predictor
 from src.pipeline.config import ModelConfig, PreparedModel, parse_integer, parse_number
 
-type OptionValue = int | float | str | tuple[int, ...] | None
+type OptionValue = int | float | str | tuple[int, ...] | tuple[str, ...] | Path | None
 type ModelOptions = Mapping[str, OptionValue]
 
 
@@ -115,7 +116,35 @@ def _gradient_options(raw: Mapping[str, str]) -> dict[str, OptionValue]:
     }
 
 
+def _ini_options(config: ModelConfig, raw: Mapping[str, str]) -> ModelOptions | None:
+    if "config" not in raw:
+        if "profile" in raw:
+            raise ValueError("option profile requires config")
+        return None
+    _validate(config, raw, set(raw), {"aki_label", "aki_stage"})
+    if raw.keys() - {"config", "profile"}:
+        raise ValueError(
+            "Model INI is authoritative; cannot combine config with inline training options"
+        )
+    path = Path(raw["config"])
+    if not path.is_absolute():
+        path = (config.source_dir or Path.cwd()) / path
+    ini_path = path.resolve()
+    profile = raw.get("profile", config.model_type)
+    if config.run:
+        from src.models.config import load_classifier_settings
+
+        load_classifier_settings(
+            ini_path, model_type=config.model_type, profile=profile
+        )
+    options: dict[str, OptionValue] = {"model_config": ini_path, "profile": profile}
+    return MappingProxyType(options)
+
+
 def _logistic_options(config: ModelConfig, raw: Mapping[str, str]) -> ModelOptions:
+    configured = _ini_options(config, raw)
+    if configured is not None:
+        return configured
     _validate(
         config,
         raw,
@@ -127,7 +156,30 @@ def _logistic_options(config: ModelConfig, raw: Mapping[str, str]) -> ModelOptio
     return MappingProxyType(options)
 
 
+def _multioutput_options(config: ModelConfig, raw: Mapping[str, str]) -> ModelOptions:
+    configured = _ini_options(config, raw)
+    if configured is not None:
+        return configured
+    _validate(config, raw, {"epochs", "learning_rate"}, {"aki_label", "aki_stage"})
+    return MappingProxyType(
+        {
+            "epochs": parse_integer(
+                raw.get("epochs", "1000"), "option epochs", minimum=1
+            ),
+            "learning_rate": parse_number(
+                raw.get("learning_rate", "0.05"),
+                "option learning_rate",
+                minimum=0,
+                exclusive_minimum=True,
+            ),
+        }
+    )
+
+
 def _multilayer_options(config: ModelConfig, raw: Mapping[str, str]) -> ModelOptions:
+    configured = _ini_options(config, raw)
+    if configured is not None:
+        return configured
     _validate(
         config,
         raw,
@@ -177,4 +229,5 @@ def create_default_registry() -> ModelRegistry:
     registry.register("rosenblatt_perceptron", _rosenblatt_options, _fit_model)
     registry.register("logistic_regression", _logistic_options, _fit_model)
     registry.register("multilayer_perceptron", _multilayer_options, _fit_model)
+    registry.register("multi_output_perceptron", _multioutput_options, _fit_model)
     return registry

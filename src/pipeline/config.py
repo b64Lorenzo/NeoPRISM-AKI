@@ -58,6 +58,7 @@ class ModelConfig:
     train_fraction: float
     seed: int
     run: bool = False
+    source_dir: Path | None = None
 
 
 class PreparedModel(Protocol):
@@ -279,6 +280,7 @@ def _model(element: ET.Element, base: Path) -> tuple[ModelConfig, dict[str, str]
         train_fraction=fraction,
         seed=parse_integer(_attribute(split, "seed"), "seed"),
         run=_boolean(element, "run"),
+        source_dir=base,
     )
     return config, options
 
@@ -310,7 +312,7 @@ def load_config(
     *,
     max_bytes: int = MAX_XML_BYTES,
 ) -> PipelineConfig:
-    """Parse and validate without reading referenced INIs or matrix files."""
+    """Validate XML and enabled model INIs, never clinical INIs or matrix files."""
     if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 1:
         raise ValueError("XML size limit must be a positive integer")
     path = Path(config_path).resolve()

@@ -2,11 +2,13 @@
 
 import csv
 import json
+from dataclasses import asdict
 from pathlib import Path
 
 from src.models.contracts import TARGETS, is_forbidden_predictor
 from src.models.data import Transformer, read_matrix, split_rows
 from src.models.evaluation.report import save_classification_report
+from src.models.factory import restore_model
 from src.models.rosenblatt_perceptron.core import train as train_rosenblatt
 from src.models.rosenblatt_perceptron.execution.predict import (
     predict_csv as predict_rosenblatt,
@@ -14,22 +16,49 @@ from src.models.rosenblatt_perceptron.execution.predict import (
 from src.models.rosenblatt_perceptron.plots.charts import save_training_plots
 from src.models.rosenblatt_perceptron.validation.report import save_report
 
-MODEL_TYPES = ("rosenblatt_perceptron", "logistic_regression", "multilayer_perceptron")
+MODEL_TYPES = (
+    "rosenblatt_perceptron",
+    "logistic_regression",
+    "multilayer_perceptron",
+    "multi_output_perceptron",
+)
 
 
-def _probabilistic_model(kind, width, classes, seed, l2, hidden_layers, activation):
+def _model_constructor(
+    kind,
+    width,
+    classes,
+    seed,
+    l2,
+    hidden_layers,
+    activation,
+    hidden_activations,
+    init_methods,
+):
     if kind == "logistic_regression":
-        from src.models.logistic_regression import LogisticRegression
-
-        return LogisticRegression(l2=l2, seed=seed)
+        return {"l2": l2, "seed": seed}
     if l2 != 0:
         raise ValueError("l2 is currently supported only by logistic regression")
-    from src.models.neural_network import MultiLayerPerceptron
-
-    shape = [width, *hidden_layers, len(classes)]
-    return MultiLayerPerceptron(
-        shape, [activation] * len(hidden_layers) + ["softmax"], seed=seed
-    )
+    if kind == "multi_output_perceptron":
+        return {"seed": seed}
+    if hidden_activations is not None:
+        if activation is not None:
+            raise ValueError("Use activation or hidden_activations, not both")
+        activations = list(hidden_activations)
+        if len(activations) != len(hidden_layers):
+            raise ValueError(
+                "hidden_activations must have one activation per hidden layer"
+            )
+    else:
+        activations = ["relu" if activation is None else activation] * len(
+            hidden_layers
+        )
+    return {
+        "shape": [width, *hidden_layers, len(classes)],
+        "activation_functions": [*activations, "softmax"],
+        "init_methods": init_methods,
+        "seed": seed,
+    }
 
 
 def _save_history(history, output):
@@ -66,12 +95,17 @@ def _save_history(history, output):
     figure.write_html(output / "training.html", include_plotlyjs=True)
 
 
-def _write_predictions(path, ids, predictions, probabilities, classes, truth=None):
+def _write_predictions(
+    path, ids, predictions, probabilities, classes, truth=None, *, probabilistic=True
+):
     fields = [
         "patient_id",
         *(["true_label"] if truth is not None else []),
         "predicted_label",
-        *[f"probability_{label}" for label in classes],
+        *[
+            f"{'probability' if probabilistic else 'score'}_{label}"
+            for label in classes
+        ],
     ]
     with Path(path).open("w", newline="", encoding="utf8") as stream:
         writer = csv.writer(stream)
@@ -87,6 +121,59 @@ def _write_predictions(path, ids, predictions, probabilities, classes, truth=Non
             )
 
 
+def _configured_training(model_type, model_config, profile, overrides):
+    values = {
+        "epochs": 1000,
+        "learning_rate": 0.05,
+        "batch_size": 32,
+        "tolerance": 0.0,
+        "l2": 0.0,
+        "hidden_layers": (16,),
+        "activation": None,
+        "hidden_activations": None,
+        "init_methods": None,
+    }
+    if model_config is None:
+        if profile is not None:
+            raise ValueError("profile requires model_config")
+        if model_type == "multi_output_perceptron" and any(
+            value is not None
+            for key, value in overrides.items()
+            if key not in {"epochs", "learning_rate"}
+        ):
+            raise ValueError(
+                "multi_output_perceptron supports only online epochs and learning_rate options"
+            )
+        values.update(
+            {key: value for key, value in overrides.items() if value is not None}
+        )
+        return values, {}
+    if any(value is not None for value in overrides.values()):
+        raise ValueError(
+            "Model INI is authoritative; cannot combine it with architecture or training overrides"
+        )
+    from src.models.config import (
+        LogisticSettings,
+        MLPSettings,
+        load_classifier_settings,
+    )
+
+    settings = load_classifier_settings(
+        model_config, model_type=model_type, profile=profile
+    )
+    model = settings.model
+    values.update(asdict(model.training))
+    if isinstance(model, MLPSettings):
+        values.update(
+            hidden_layers=model.hidden_layers,
+            hidden_activations=model.hidden_activations,
+            init_methods=model.init_methods,
+        )
+    elif isinstance(model, LogisticSettings):
+        values["l2"] = model.l2
+    return values, asdict(settings.ray)
+
+
 def fit(
     matrix,
     output_dir,
@@ -96,13 +183,17 @@ def fit(
     features=None,
     train_fraction=0.8,
     seed=2026,
-    epochs=1000,
+    epochs=None,
     learning_rate=None,
-    batch_size=32,
-    tolerance=0.0,
-    l2=0.0,
-    hidden_layers=(16,),
-    activation="relu",
+    batch_size=None,
+    tolerance=None,
+    l2=None,
+    hidden_layers=None,
+    activation=None,
+    hidden_activations=None,
+    init_methods=None,
+    model_config=None,
+    profile=None,
     threshold=0.0,
     clamped=False,
 ):
@@ -119,6 +210,32 @@ def fit(
         raise ValueError("The Rosenblatt model is binary and requires aki_label")
     if not binary_rosenblatt and threshold != 0:
         raise ValueError("threshold is supported only by the Rosenblatt model")
+    if binary_rosenblatt and (model_config is not None or profile is not None):
+        raise ValueError(
+            "Model INI profiles are not used by the course Rosenblatt model"
+        )
+    values, ray_options = _configured_training(
+        model_type,
+        model_config,
+        profile,
+        {
+            "epochs": epochs,
+            "learning_rate": learning_rate,
+            "batch_size": batch_size,
+            "tolerance": tolerance,
+            "l2": l2,
+            "hidden_layers": hidden_layers,
+            "activation": activation,
+            "hidden_activations": hidden_activations,
+            "init_methods": init_methods,
+        },
+    )
+    epochs, learning_rate = values["epochs"], values["learning_rate"]
+    batch_size, tolerance = values["batch_size"], values["tolerance"]
+    l2, hidden_layers = values["l2"], values["hidden_layers"]
+    activation, hidden_activations = values["activation"], values["hidden_activations"]
+    init_methods = values["init_methods"]
+    probabilistic = model_type != "multi_output_perceptron"
     rows, features = read_matrix(matrix, target_column=target_column, features=features)
     training, validation, excluded = split_rows(
         rows, train_fraction, seed, target_column=target_column
@@ -147,34 +264,49 @@ def fit(
         scores = [model.score(row) for row in xv]
         predictions = [1 if score >= 0 else -1 for score in scores]
     else:
-        model = _probabilistic_model(
-            model_type, len(x[0]), sorted(set(y)), seed, l2, hidden_layers, activation
+        from src.models.ray_backend import fit_with_ray
+
+        constructor = _model_constructor(
+            model_type,
+            len(x[0]),
+            sorted(set(y)),
+            seed,
+            l2,
+            hidden_layers,
+            activation,
+            hidden_activations,
+            init_methods,
         )
         rate = 0.05 if learning_rate is None else learning_rate
-        model.fit(
-            x,
-            y,
-            epochs=epochs,
-            learning_rate=rate,
-            batch_size=batch_size,
-            tolerance=tolerance,
+        fit_options = {"epochs": epochs, "learning_rate": rate}
+        if model_type != "multi_output_perceptron":
+            fit_options.update(batch_size=batch_size, tolerance=tolerance)
+        payload, execution = fit_with_ray(
+            model_type, x, y, constructor, fit_options, **ray_options
         )
+        model = restore_model(model_type, payload)
         history = model.history_
         stats = {
             "epochs_run": len(history),
             "max_epochs": epochs,
             "learning_rate": rate,
-            "batch_size": batch_size,
-            "tolerance": tolerance,
             "seed": seed,
+            "execution": execution,
+            "loss": "cross_entropy" if probabilistic else "mistake_rate",
         }
+        if probabilistic:
+            stats.update(batch_size=batch_size, tolerance=tolerance)
+        else:
+            stats.update(updates=model.updates_, converged=model.converged_)
         artifact = {
             "schema_version": 1,
             "model_type": model_type,
             "target_column": target_column,
             "model": model.to_dict(),
         }
-        probabilities = model.predict_proba(xv)
+        probabilities = (
+            model.predict_proba(xv) if probabilistic else model.decision_function(xv)
+        )
         predictions = model.predict(xv)
     stats.update(
         {
@@ -196,7 +328,12 @@ def fit(
         _save_history(history, output)
         classes = model.classes_.tolist()
         scores = (
-            probabilities[:, classes.index(1)].tolist()
+            (
+                probabilities[:, classes.index(1)]
+                if probabilistic
+                else probabilities[:, classes.index(1)]
+                - probabilities[:, classes.index(-1)]
+            ).tolist()
             if target_column == "aki_label"
             else None
         )
@@ -214,6 +351,7 @@ def fit(
             probabilities,
             classes,
             truth,
+            probabilistic=probabilistic,
         )
     (output / "model.json").write_text(
         json.dumps(artifact, indent=2, allow_nan=False), encoding="utf8"
@@ -241,15 +379,7 @@ def load_artifact(path):
     if not isinstance(payload, dict) or payload.get("schema_version") != 1:
         raise ValueError("Unsupported model artifact schema")
     kind = payload.get("model_type")
-    if kind == "logistic_regression":
-        from src.models.logistic_regression import LogisticRegression
-
-        model_class = LogisticRegression
-    elif kind == "multilayer_perceptron":
-        from src.models.neural_network import MultiLayerPerceptron
-
-        model_class = MultiLayerPerceptron
-    else:
+    if kind not in MODEL_TYPES or kind == "rosenblatt_perceptron":
         raise ValueError("Unsupported model type")
     try:
         target = payload["target_column"]
@@ -258,11 +388,14 @@ def load_artifact(path):
         transformer = Transformer.from_dict(payload["transformer"])
         if any(is_forbidden_predictor(key) for key in transformer.features):
             raise ValueError("Artifact contains outcome predictors")
-        model = model_class.from_dict(payload["model"])
+        model = restore_model(kind, payload["model"])
         classes = model.classes_.tolist()
         if not set(classes).issubset(TARGETS[target]) or len(classes) < 2:
             raise ValueError("Model classes do not match target")
-        model.predict_proba([transformer.transform_one({})])
+        if kind == "multi_output_perceptron":
+            model.decision_function([transformer.transform_one({})])
+        else:
+            model.predict_proba([transformer.transform_one({})])
     except (KeyError, TypeError, AttributeError) as error:
         raise ValueError("Malformed model artifact") from error
     return model, transformer, target
@@ -288,7 +421,11 @@ def predict_csv(artifact, input_csv, output_csv, *, expected_type=None):
     if not rows:
         raise ValueError("Novel matrix contains no patients")
     x = transformer.transform(rows)
-    probabilities, predictions = model.predict_proba(x), model.predict(x)
+    probabilistic = canonical != "multi_output_perceptron"
+    probabilities = (
+        model.predict_proba(x) if probabilistic else model.decision_function(x)
+    )
+    predictions = model.predict(x)
     output = Path(output_csv)
     output.parent.mkdir(parents=True, exist_ok=True)
     _write_predictions(
@@ -297,5 +434,6 @@ def predict_csv(artifact, input_csv, output_csv, *, expected_type=None):
         predictions,
         probabilities,
         model.classes_.tolist(),
+        probabilistic=probabilistic,
     )
     return len(rows)

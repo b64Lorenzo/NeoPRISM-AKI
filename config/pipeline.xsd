@@ -73,7 +73,7 @@
     <xs:attribute name="seed" type="xs:nonNegativeInteger" use="required"/>
   </xs:complexType>
   <xs:complexType name="Options">
-    <xs:annotation><xs:documentation>Plugin-specific name/value settings; runtime parses and validates their types. Rosenblatt uses epochs, a finite update threshold, and a clamped XML boolean; its dimension-normalized update rate is fixed.</xs:documentation></xs:annotation>
+    <xs:annotation><xs:documentation>Plugin-specific settings. Ray classifiers accept config (model INI path relative to XML) and optional profile, exclusively rather than inline training options. Enabled model INIs are validated before execution; disabled references are not opened. Legacy inline options remain supported. Rosenblatt uses epochs, a finite update threshold, and clamped; its dimension-normalized update rate is fixed. The hard multi_output_perceptron supports only epochs and learning_rate inline.</xs:documentation></xs:annotation>
     <xs:sequence>
       <xs:element name="option" minOccurs="0" maxOccurs="unbounded">
         <xs:annotation><xs:documentation>A Python option name and nonblank value, unique within this model.</xs:documentation></xs:annotation>

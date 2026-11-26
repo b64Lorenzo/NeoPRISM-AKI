@@ -34,11 +34,9 @@
       <features><column>feature_1</column><column>feature_2</column></features>
       <split trainFraction="0.8" seed="2026"/>
       <options>
-        <option name="epochs" value="1000"/>
-        <option name="learning_rate" value="0.05"/>
-        <option name="batch_size" value="32"/>
-        <option name="tolerance" value="0"/>
-        <option name="l2" value="0"/>
+        <!-- Model/training/Ray settings live in this INI, not inline overrides. -->
+        <option name="config" value="models.example.ini"/>
+        <option name="profile" value="logistic_regression"/>
       </options>
     </model>
     <model id="mlp_baseline" type="multilayer_perceptron" run="false">
@@ -48,12 +46,21 @@
       <features><column>feature_1</column><column>feature_2</column></features>
       <split trainFraction="0.8" seed="2026"/>
       <options>
-        <option name="epochs" value="1000"/>
-        <option name="learning_rate" value="0.05"/>
-        <option name="batch_size" value="32"/>
-        <option name="tolerance" value="0"/>
-        <option name="hidden_layers" value="16"/>
-        <option name="activation" value="relu"/>
+        <!-- Edit hidden_layers / hidden_activations per layer in this INI. -->
+        <option name="config" value="models.example.ini"/>
+        <option name="profile" value="multilayer_perceptron"/>
+      </options>
+    </model>
+    <model id="multioutput_baseline" type="multi_output_perceptron" run="false">
+      <inputMatrix>../results/inputsModel/patients_labeled.csv</inputMatrix>
+      <outputDir>../results/models/multioutput_baseline</outputDir>
+      <targetColumn>aki_label</targetColumn>
+      <features><column>feature_1</column><column>feature_2</column></features>
+      <split trainFraction="0.8" seed="2026"/>
+      <options>
+        <!-- Linear hard classifier, not a softmax network: scores, not probabilities. -->
+        <option name="config" value="models.example.ini"/>
+        <option name="profile" value="multi_output_perceptron"/>
       </options>
     </model>
   </models>

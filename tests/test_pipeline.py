@@ -651,7 +651,14 @@ def test_checked_in_templates_are_disabled_and_load_without_domain_files(name):
         "rosenblatt_perceptron",
         "logistic_regression",
         "multilayer_perceptron",
+        "multi_output_perceptron",
     ]
+    for step in config.models[1:]:
+        assert (
+            step.options["model_config"]
+            == (ROOT / "config/models.example.ini").resolve()
+        )
+        assert step.options["profile"] == step.config.model_type
     assert all(not step.config.run for step in config.models)
     assert run_pipeline(path) == 0
 

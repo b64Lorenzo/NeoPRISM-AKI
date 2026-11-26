@@ -47,7 +47,8 @@ def _run_preprocessing(config: PreprocessingConfig) -> int:
 def run_pipeline(config_path: str | Path, registry: ModelRegistry | None = None) -> int:
     """Validate every XML entry, then run enabled stages and models in order.
 
-    Parsing does not inspect referenced files. Matrix existence is checked only
+    Enabled model INIs are preflighted, disabled references are not opened.
+    Clinical INIs are left to their stages. Matrix existence is checked only
     after preprocessing, immediately before that model's handler is invoked.
     """
     config = load_config(config_path, registry)
