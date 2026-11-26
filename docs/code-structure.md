@@ -68,7 +68,7 @@ Plotting's `config.py` reads `[value_heatmaps] parameter_ids`, while `run.py` in
 
 ## Added model packages
 
-`src/preprocessing/inputsModel/` builds one-row-per-patient matrices and reads independently adjudicated AKI labels. `src/models/rosenblatt_perceptron/` holds the binary baseline and preserves its existing artifacts and commands.
+`src/preprocessing/inputsModel/` builds one-row-per-patient matrices and reads independently adjudicated AKI labels. `src/models/rosenblatt_perceptron/` holds the binary course-aligned baseline, retains the train/predict entry points, and reads existing saved artifacts for inference. New training semantics and the removed rate override are described in the [migration guide](rosenblatt-perceptron.md#migration-from-the-earlier-adaptation).
 
 ```text
 src/models/

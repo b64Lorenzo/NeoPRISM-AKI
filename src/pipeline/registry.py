@@ -82,25 +82,17 @@ def _validate(
 
 
 def _rosenblatt_options(config: ModelConfig, raw: Mapping[str, str]) -> ModelOptions:
-    _validate(config, raw, {"epochs", "learning_rate", "threshold"}, {"aki_label"})
+    _validate(config, raw, {"epochs", "threshold", "clamped"}, {"aki_label"})
+    clamped = raw.get("clamped", "false")
+    if clamped not in {"true", "false", "1", "0"}:
+        raise ValueError("option clamped must be true, false, 1 or 0")
     return MappingProxyType(
         {
             "epochs": parse_integer(
                 raw.get("epochs", "100"), "option epochs", minimum=1
             ),
-            "learning_rate": (
-                parse_number(
-                    raw["learning_rate"],
-                    "option learning_rate",
-                    minimum=0,
-                    exclusive_minimum=True,
-                )
-                if "learning_rate" in raw
-                else None
-            ),
-            "threshold": parse_number(
-                raw.get("threshold", "0"), "option threshold", minimum=0
-            ),
+            "threshold": parse_number(raw.get("threshold", "0"), "option threshold"),
+            "clamped": clamped in {"true", "1"},
         }
     )
 

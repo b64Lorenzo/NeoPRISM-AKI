@@ -3,10 +3,12 @@ import csv
 import json
 import random
 from pathlib import Path
+
 from src.models.rosenblatt_perceptron.core import train
+from src.models.rosenblatt_perceptron.plots.charts import save_training_plots
 from src.models.rosenblatt_perceptron.transform import Transformer
 from src.models.rosenblatt_perceptron.validation.report import save_report
-from src.models.rosenblatt_perceptron.plots.charts import save_training_plots
+
 
 def read_matrix(path):
     with Path(path).open(newline='',encoding='utf-8-sig') as f:
@@ -38,19 +40,19 @@ def split(rows,fraction,seed):
     rng.shuffle(train_rows);rng.shuffle(validation)
     return train_rows,validation,len(excluded)
 
-def fit(matrix,output_dir,*,train_fraction=.8,seed=2026,epochs=100,learning_rate=None,threshold=0.0):
+def fit(matrix,output_dir,*,train_fraction=.8,seed=2026,epochs=100,threshold=0.0,clamped=False):
     rows,features=read_matrix(matrix)
     training,validation,excluded=split(rows,train_fraction,seed)
     transformer=Transformer.fit(training,features)
     X=transformer.transform(training);y=[int(r['aki_label']) for r in training]
-    model,stats=train(X,y,epochs=epochs,learning_rate=learning_rate,threshold=threshold,seed=seed)
+    model,stats=train(X,y,epochs=epochs,threshold=threshold,clamped=clamped)
     output=Path(output_dir);output.mkdir(parents=True,exist_ok=True)
     history=stats.pop('history')
     save_training_plots(history,output/'plots'/'convergence')
     artifact={'schema_version':1,'model_type':'binary_rosenblatt_perceptron',
         'labels':{'-1':'No AKI','1':'AKI'},'weights':model.weights,'bias':model.bias,
         'threshold':model.threshold,'transformer':transformer.to_dict(),
-        'training':{**stats,'train_fraction':train_fraction,'training_patients':len(training),
+        'training':{**stats,'seed':seed,'train_fraction':train_fraction,'training_patients':len(training),
                     'validation_patients':len(validation),'excluded_unlabeled':excluded}}
     (output/'model.json').write_text(json.dumps(artifact,indent=2,allow_nan=False),encoding='utf8')
     xv=transformer.transform(validation);scores=[model.score(x) for x in xv]

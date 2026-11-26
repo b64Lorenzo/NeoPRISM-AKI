@@ -21,8 +21,10 @@
       <split trainFraction="0.8" seed="2026"/>
       <options>
         <option name="epochs" value="100"/>
-        <!-- Omit learning_rate to retain the legacy automatically chosen rate. -->
         <option name="threshold" value="0"/>
+        <!-- Course default: homogeneous. Set true to append a +1 bias input.
+             The update is always y*x/N, or y*x/(N+1) in clamped mode. -->
+        <option name="clamped" value="false"/>
       </options>
     </model>
     <model id="logistic_baseline" type="logistic_regression" run="false">

@@ -30,6 +30,12 @@ uv run python -m pytest -q tests src/models/rosenblatt_perceptron/tests src/test
 
 See [model-input documentation](docs/model-inputs-and-labels.md), [model documentation](docs/rosenblatt-perceptron.md), [plotting documentation](docs/plotting-and-patient-dashboards.md), [release process](docs/release-process.md), and [project structure](docs/code-structure.md).
 
+Rosenblatt training matches the [NNCI course implementation](docs/rosenblatt-perceptron.md):
+fixed example order, update `y*x/N`, homogeneous by default, and strictly
+positive-margin convergence. Add `--clamped` for a bias input and denominator
+N+1. The split seed is separate from training; custom Rosenblatt learning rates
+are no longer supported. Existing saved models remain usable for inference.
+
 ## Additional models and XML pipeline
 
 ```bash

@@ -2,6 +2,15 @@
 
 Project releases use `vX.Y.Z` tags. See [the release process](docs/release-process.md).
 
+## [0.3.0] — 2026-11-26
+
+### Changed
+
+- Match the Rosenblatt numerical trainer to `nnci-course-python` commit `be038b430b599df713ee9de01ef54290306d1671`: zero initialization, fixed example order, per-coordinate `y*x/N` updates, per-pattern embedding strengths, and strict positive-margin convergence independent of the update threshold.
+- Default to homogeneous training; expose `--clamped` / XML `clamped` for explicit constant-input augmentation using denominator N+1. Remove custom Rosenblatt learning-rate overrides and accept any finite update threshold, matching the reference.
+- Keep schema-version-1 saved-model inference compatible. Retraining intentionally differs from the earlier always-biased, shuffled adaptation; document migration and distinguish update-threshold violations from convergence diagnostics.
+- Add exact reference-oracle comparisons and synthetic CSV/CLI/XML integration coverage. No patient data processed by verification.
+
 ## [0.2.0] — 2026-11-24
 
 Adds additional model families and an optional XML-configured pipeline.

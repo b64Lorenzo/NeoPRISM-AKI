@@ -1,7 +1,7 @@
 # XML pipeline
 
 XML is an optional orchestration layer, not a replacement for the parameter,
-plotting, or model-input INIs. Existing commands keep their current interfaces.
+plotting, or model-input INIs. Existing preprocessing commands keep their interfaces.
 The distributed `config/pipeline.xml` and `config/pipeline.example.xml` are safe,
 disabled starters: loading or running either reads no domain files and creates no
 output directories.
@@ -97,16 +97,24 @@ strictly positive; tolerance and L2 are nonnegative.
 
 | Type | Targets | Options and defaults |
 | --- | --- | --- |
-| `rosenblatt_perceptron` | `aki_label` only | `epochs=100`, omitted `learning_rate=None`, `threshold=0` |
+| `rosenblatt_perceptron` | `aki_label` only | `epochs=100`, `threshold=0`, `clamped=false` |
 | `logistic_regression` | `aki_label`, `aki_stage` | `epochs=1000`, `learning_rate=0.05`, `batch_size=32`, `tolerance=0`, `l2=0` |
 | `multilayer_perceptron` | `aki_label`, `aki_stage` | `epochs=1000`, `learning_rate=0.05`, `batch_size=32`, `tolerance=0`, `hidden_layers=(16,)`, `activation=relu` |
 
 `hidden_layers` uses comma-separated positive widths, for example `32,16`.
 `activation` accepts `relu`, `leaky_relu`, `sigmoid`, `tanh`, or `linear`, matching
-the standalone MLP CLI. Rosenblatt thresholds must be nonnegative. Its automatic learning
-rate is selected by **omitting** that option, not by writing the string `None`.
-Options not listed for that particular type are rejected. MLP has no `l2` option;
-Rosenblatt has no minibatch or tolerance option.
+the standalone MLP CLI. Rosenblatt follows the [course algorithm](rosenblatt-perceptron.md):
+fixed example order, homogeneous by default, and an update of `y*x/N`.
+`clamped=true` (also `1`) appends a constant +1 input and changes the denominator
+to N+1; `false` and `0` select homogeneous mode. Its update threshold may be any
+finite number, including negative values. Convergence always requires strictly
+positive signed margins, independently of that update threshold. The split seed
+does not reshuffle epochs.
+
+Remove old Rosenblatt `learning_rate` options: custom rates are now rejected to
+match the reference. Options not listed for a type are rejected. MLP has no `l2`
+option; Rosenblatt has no minibatch or tolerance option. Existing saved-model
+inference remains compatible; new training intentionally changes semantics.
 
 Built-in execution imports `src.models.classification.fit` only when a model is
 enabled and its matrix exists, then calls exactly:

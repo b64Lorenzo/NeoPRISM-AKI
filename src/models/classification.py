@@ -104,10 +104,17 @@ def fit(
     hidden_layers=(16,),
     activation="relu",
     threshold=0.0,
+    clamped=False,
 ):
     if model_type not in MODEL_TYPES:
         raise ValueError("Unknown model type")
     binary_rosenblatt = model_type == "rosenblatt_perceptron"
+    if binary_rosenblatt and learning_rate is not None:
+        raise ValueError(
+            "Rosenblatt uses a fixed dimension-normalized learning rate; remove learning_rate"
+        )
+    if not binary_rosenblatt and clamped:
+        raise ValueError("clamped is supported only by the Rosenblatt model")
     if binary_rosenblatt and target_column != "aki_label":
         raise ValueError("The Rosenblatt model is binary and requires aki_label")
     if not binary_rosenblatt and threshold != 0:
@@ -125,9 +132,8 @@ def fit(
             x,
             y,
             epochs=epochs,
-            learning_rate=learning_rate,
             threshold=threshold,
-            seed=seed,
+            clamped=clamped,
         )
         history = stats.pop("history")
         artifact = {
@@ -173,6 +179,7 @@ def fit(
     stats.update(
         {
             "train_fraction": train_fraction,
+            "seed": seed,
             "training_patients": len(training),
             "validation_patients": len(validation),
             "excluded_unlabeled": excluded,

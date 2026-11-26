@@ -2,6 +2,7 @@
 import csv
 from pathlib import Path
 
+
 def _mpl():
     try:
         import matplotlib
@@ -19,8 +20,8 @@ def save_training_plots(history, output):
     plt=_mpl()
     if plt is None:return []
     specs=[('updates_epoch','Updates per epoch','updates_by_epoch.png'),
-           ('violations','Margin violations after epoch','violations_by_epoch.png'),
-           ('training_accuracy','Training accuracy','accuracy_by_epoch.png'),
+           ('violations','Update-threshold violations after epoch','violations_by_epoch.png'),
+           ('training_accuracy','Strict positive-margin fraction','accuracy_by_epoch.png'),
            ('perceptron_loss','Mean perceptron loss','loss_by_epoch.png'),
            ('mean_signed_margin','Mean signed margin','margin_by_epoch.png')]
     paths=[]

@@ -20,14 +20,41 @@ def _xml(
     return path
 
 
-def test_xml_rejects_negative_rosenblatt_threshold_during_loading(tmp_path):
+def test_xml_accepts_negative_finite_rosenblatt_threshold_like_the_course(tmp_path):
     path = _xml(
         tmp_path,
         kind="rosenblatt_perceptron",
         options='<option name="threshold" value="-1"/>',
     )
-    with pytest.raises(ValueError, match="threshold"):
-        load_config(path)
+    step = load_config(path).models[0]
+    assert step.options["threshold"] == -1.0
+    assert step.options["clamped"] is False
+
+
+@pytest.mark.parametrize(
+    "value,expected", [("true", True), ("false", False), ("1", True), ("0", False)]
+)
+def test_xml_rosenblatt_clamped_is_an_explicit_boolean(tmp_path, value, expected):
+    step = load_config(
+        _xml(
+            tmp_path,
+            kind="rosenblatt_perceptron",
+            options=f'<option name="clamped" value="{value}"/>',
+        )
+    ).models[0]
+    assert step.options["clamped"] is expected
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        '<option name="clamped" value="yes"/>',
+        '<option name="learning_rate" value="0.1"/>',
+    ],
+)
+def test_xml_rejects_nonreference_rosenblatt_options(tmp_path, options):
+    with pytest.raises(ValueError, match="clamped|learning_rate"):
+        load_config(_xml(tmp_path, kind="rosenblatt_perceptron", options=options))
 
 
 @pytest.mark.parametrize(

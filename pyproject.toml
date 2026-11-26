@@ -1,6 +1,6 @@
 [project]
 name = "aki-pipeline"
-version = "0.2.0"
+version = "0.3.0"
 description = "Research-only perioperative AKI preprocessing and model-baseline framework"
 requires-python = ">=3.12,<3.14"
 dependencies = [

@@ -162,7 +162,7 @@ def test_models_own_their_paths_features_and_split(tmp_path):
     [
         (
             "rosenblatt_perceptron",
-            {"epochs": 100, "learning_rate": None, "threshold": 0.0},
+            {"epochs": 100, "threshold": 0.0, "clamped": False},
         ),
         (
             "logistic_regression",
