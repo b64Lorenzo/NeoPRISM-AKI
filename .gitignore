@@ -18,4 +18,5 @@ data/labels/*.csv
 /config/parameters.ini
 /config/plotting.ini
 /config/inputsModel.ini
+/config/models.ini
 .DS_Store
