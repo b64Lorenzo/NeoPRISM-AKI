@@ -1,6 +1,6 @@
 [project]
 name = "aki-pipeline"
-version = "0.3.0"
+version = "0.4.0"
 description = "Research-only perioperative AKI preprocessing and model-baseline framework"
 requires-python = ">=3.12,<3.14"
 dependencies = [
@@ -8,6 +8,7 @@ dependencies = [
     "numpy",
     "pandas",
     "plotly",
+    "ray>=2.60.1,<2.61",
 ]
 
 [dependency-groups]
