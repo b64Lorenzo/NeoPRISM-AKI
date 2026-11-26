@@ -48,6 +48,7 @@ flowchart TD
 ### Configuration ownership
 
 - `parameters.ini` controls **what to extract**, when phases start/end, source fields, types and deterministic derivations.
+- `models.ini` controls classifier architecture, per-layer activations, optimizer settings and local Ray resources; data paths, features, targets and split stay in CLI/XML.
 - `plotting.ini` controls **what to display**, which patients and phases to load, output directories and chart themes.
 - `patient_dashboard.py` renders one patient's observations, but never recalculates patient boundaries: `data.py` reads them from the extraction summary.
 
@@ -74,16 +75,24 @@ Plotting's `config.py` reads `[value_heatmaps] parameter_ids`, while `run.py` in
 src/models/
   contracts.py                   # Shared feature/target/activation contracts
   data.py                        # Patient matrices, stratified splits and frozen transforms
-  classification.py              # Shared train/evaluate/save/load/predict orchestration
+  classification.py              # Driver-owned split/transform/reports and Ray orchestration
+  config.py                      # Immutable, strict model INI profiles; stdlib only
+  factory.py                     # Numerical model construction and portable restoration
+  ray_backend.py                 # Actual local worker tasks, resources and lifecycle
   evaluation/                    # Binary/multiclass confusion matrices and reports
   neural_network/                 # activation_func.py, nnUtils.py, nnClass.py (MLP)
   logistic_regression/            # Regularized multinomial softmax model
+  multi_output_perceptron/        # Sequential multiclass mistake learner; raw scores
   rosenblatt_perceptron/          # Existing binary baseline
-  run.py                         # Logistic/MLP CLI registration
+  run.py                         # Logistic/MLP/multioutput CLI registration
 src/pipeline/
   config.py                      # Strict XML parsing, typed stage/model configuration
   registry.py                    # Extensible option-parser/runner pairs
   run.py                         # Ordered execution and pipeline CLI registration
 ```
 
-See [classification models](classification-models.md), [XML pipeline](xml-pipeline.md), and [Rosenblatt perceptron](rosenblatt-perceptron.md).
+The numerical kernels remain independent of Ray, splitting and I/O. The shared
+patient workflow sends numeric arrays/settings to one Ray task per fit, not raw
+clinical records or patient IDs. Inference restores JSON without Ray.
+
+See [model configuration](model-configuration.md), [classification models](classification-models.md), [XML pipeline](xml-pipeline.md), and [Rosenblatt perceptron](rosenblatt-perceptron.md).

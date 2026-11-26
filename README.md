@@ -4,9 +4,9 @@
 
 ![NeoPRISM-AKI prism banner — preprocessing, missingness analysis, and model roadmap](assets/branding/banner.png)
 
-NeoPRISM-AKI is a research-only Python framework for retrospective perioperative data. It provides configurable parameter extraction, phase-aware missingness views, patient-level model inputs, a **binary Rosenblatt perceptron**, **multinomial logistic regression**, and a **multilayer perceptron (MLP)**. An optional XML pipeline runs configured stages and models without replacing the existing INI catalogs or standalone commands.
+NeoPRISM-AKI (Neonatal and Early-Childhood Perioperative Risk Inference and Sequential Modelling) is a research-only Python framework for retrospective perioperative data. It provides configurable parameter extraction, phase-aware missingness views, patient-level model inputs, a **binary Rosenblatt perceptron**, **multinomial logistic regression**, a **multilayer perceptron (MLP)**, and a **hard multiclass multi-output perceptron**. The three multiclass training workflows execute in real local Ray workers; the MLP supports configurable widths and different activations per hidden layer. An optional XML pipeline runs configured stages and models without replacing the existing INI catalogs or standalone commands.
 
-**The project does not infer clinical AKI outcomes from missing measurements.** A clinically adjudicated label CSV is required for training. Unknown labels remain unknown and are excluded from training, never converted to No AKI. The Rosenblatt model produces **hard class labels and uncalibrated linear scores**, not AKI risk probabilities. Logistic regression and the MLP produce class probabilities that still require out-of-sample calibration and clinical validation. It is not a clinical decision-support system.
+**The project does not infer clinical AKI outcomes from missing measurements.** A clinically adjudicated label CSV is required for training. Unknown labels remain unknown and are excluded from training, never converted to No AKI. The Rosenblatt and hard multi-output models produce **hard class labels and uncalibrated linear scores**, not AKI risk probabilities. Logistic regression and the MLP produce class probabilities that still require out-of-sample calibration and clinical validation. It is not a clinical decision-support system.
 
 ![NeoPRISM-AKI preprocessing and model workflow](assets/branding/workflow.png)
 
@@ -39,12 +39,15 @@ are no longer supported. Existing saved models remain usable for inference.
 ## Additional models and XML pipeline
 
 ```bash
-uv run python -m src.cli logistic-train --input results/inputsModel/patients_labeled.csv --output results/models/logistic_regression --l2 0.01
-uv run python -m src.cli mlp-train --input results/inputsModel/patients_labeled.csv --output results/models/multilayer_perceptron --hidden-layers 16 8
+uv run python -m src.cli logistic-train --config config/models.example.ini --input results/inputsModel/patients_labeled.csv --output results/models/logistic_regression
+uv run python -m src.cli mlp-train --config config/models.example.ini --input results/inputsModel/patients_labeled.csv --output results/models/multilayer_perceptron
+uv run python -m src.cli multioutput-train --config config/models.example.ini --input results/inputsModel/patients_labeled.csv --output results/models/multi_output_perceptron
 uv run python -m src.cli pipeline --config config/pipeline.xml
 ```
 
-The checked-in XML files have every stage disabled: edit explicit paths, feature columns and `run` flags before use. XML coordinates existing INI-configured preprocessing and independent model entries. See [classification models and reusable confusion matrices](docs/classification-models.md) and [XML configuration/extension guide](docs/xml-pipeline.md). Use `--target-column aki_stage` on either new training command for four-stage classification; the default remains binary `aki_label`.
+Edit [the commented model INI](config/models.example.ini) for widths, per-layer activations, initialization, learning and Ray settings; see [configuration and precedence](docs/model-configuration.md). With `--config`, do not also supply architecture/training flags. Without INI, legacy flags remain supported and still use Ray. Saved-model prediction does not start or import Ray. Ray support on Windows is beta.
+
+The checked-in XML files have every stage disabled: edit explicit paths, feature columns and `run` flags before use. XML coordinates existing INI-configured preprocessing and independent model entries. See [classification models and reusable confusion matrices](docs/classification-models.md) and [XML configuration/extension guide](docs/xml-pipeline.md). Use `--target-column aki_stage` on any multiclass training command for four-stage classification; the default remains binary `aki_label`.
 
 ## Research safeguards
 

@@ -2,6 +2,7 @@
 
 XML is an optional orchestration layer, not a replacement for the parameter,
 plotting, or model-input INIs. Existing preprocessing commands keep their interfaces.
+Classifier architecture/training/Ray settings live in [model INIs](model-configuration.md).
 The distributed `config/pipeline.xml` and `config/pipeline.example.xml` are safe,
 disabled starters: loading or running either reads no domain files and creates no
 output directories.
@@ -30,7 +31,7 @@ flags. XML booleans accept `true`, `false`, `1`, and `0`; omission means false.
 
 ```mermaid
 flowchart LR
-    XML[Validate complete XML] --> E[Optional extraction]
+    XML[Validate XML and enabled model INIs] --> E[Optional extraction]
     E --> P[Optional plotting]
     P --> I[Optional inputsModel]
     I --> M[Enabled models in XML order]
@@ -86,10 +87,32 @@ missing/duplicate singleton nodes, and out-of-order nodes are errors.
 All **XML-written paths** resolve against the directory containing that XML
 file, not the working directory. Absolute paths remain absolute. No environment
 variable or tilde expansion is performed. Paths *inside INIs* keep the existing
-INI loader semantics; XML does not rebase them, rewrite files, or change cwd.
+INI loader semantics; XML does not rewrite files or change cwd. In the new model
+INI specifically, `temp_directory` is relative to that INI, not to XML or cwd.
 Moving an XML file therefore requires reviewing its relative paths.
 
-## Built-in model options
+## Model INI references (recommended)
+
+For MLP, multi-output and logistic entries, use only these model options:
+
+```xml
+<options>
+  <option name="config" value="models.example.ini"/>
+  <option name="profile" value="multilayer_perceptron"/>
+</options>
+```
+
+`config` is XML-relative; `profile` is optional and defaults to the model type.
+The selected profile must declare the matching `model_type`. INI is authoritative:
+combining its reference with any inline learning/architecture setting is an error,
+even when values agree. Edit widths, per-layer activations, initialization, learning
+and local Ray resources in the INI; XML retains data paths/features/target/split.
+Enabled model INIs are validated before any preprocessing executes; disabled
+references are not opened. All three workflows use real Ray tasks, including legacy
+inline-option runs; Rosenblatt remains the unchanged course algorithm. Prediction
+uses the saved artifact, not training INIs or Ray.
+
+## Legacy inline built-in options
 
 Names below are Python keyword names, not CLI flag spellings. Numeric values
 must be finite; epochs/batch sizes/layer widths are positive integers. Rates are
@@ -100,10 +123,12 @@ strictly positive; tolerance and L2 are nonnegative.
 | `rosenblatt_perceptron` | `aki_label` only | `epochs=100`, `threshold=0`, `clamped=false` |
 | `logistic_regression` | `aki_label`, `aki_stage` | `epochs=1000`, `learning_rate=0.05`, `batch_size=32`, `tolerance=0`, `l2=0` |
 | `multilayer_perceptron` | `aki_label`, `aki_stage` | `epochs=1000`, `learning_rate=0.05`, `batch_size=32`, `tolerance=0`, `hidden_layers=(16,)`, `activation=relu` |
+| `multi_output_perceptron` | `aki_label`, `aki_stage` | `epochs=1000`, `learning_rate=0.05`; raw scores, not probabilities |
 
 `hidden_layers` uses comma-separated positive widths, for example `32,16`.
 `activation` accepts `relu`, `leaky_relu`, `sigmoid`, `tanh`, or `linear`, matching
-the standalone MLP CLI. Rosenblatt follows the [course algorithm](rosenblatt-perceptron.md):
+the standalone MLP CLI. Use the model INI for different activations per layer
+and explicit initializers. Rosenblatt follows the [course algorithm](rosenblatt-perceptron.md):
 fixed example order, homogeneous by default, and an update of `y*x/N`.
 `clamped=true` (also `1`) appends a constant +1 input and changes the denominator
 to N+1; `false` and `0` select homogeneous mode. Its update threshold may be any
@@ -144,7 +169,8 @@ parser to its matching handler. The parser signature is
 `(ModelConfig, Mapping[str, str]) -> T`; the handler is
 `(ModelConfig, T) -> int | None`. `ModelConfig` is immutable and exposes `id`,
 `model_type`, `input_matrix`, `output_dir`, `target_column`, ordered `features`,
-`train_fraction`, `seed`, and `run`.
+`train_fraction`, `seed`, `run`, and optional `source_dir` (the XML directory for
+resolving model-owned configuration references).
 
 ```python
 from dataclasses import dataclass
@@ -184,9 +210,10 @@ to change. Use `ModelRegistry()` instead for a registry containing only your own
 types. Duplicate registrations and missing/noncallable handlers are rejected.
 The same supplied registry is used for parsing and execution: each `ModelStep`
 captures its validated options and matching handler. Option parsers must be
-pure (including for disabled entries); reject unsupported settings and return
-immutable typed options. Backend imports, file reads, and output creation belong
-in the handler, not the parser.
+free of training/output side effects; reject unsupported settings and return
+immutable typed options. Disabled entries must not open references. The built-in
+INI adapter preflights enabled model INIs; clinical-file reads, backend startup
+and output creation remain in enabled execution handlers.
 
 ## Validation, failures, and schema
 
@@ -195,8 +222,10 @@ in the handler, not the parser.
 its common configuration as `.config`. Built-in options are read-only mappings.
 All XML entries and option parsers are validated **before any handler executes**,
 including disabled entries. Unknown model types are errors, not silently skipped.
-Referenced INI content, matrix headers, and training data are validated by their
-own enabled domain handlers, not by opening them during XML parsing.
+Enabled classifier INI content is preflighted during loading, using the stdlib-only
+settings parser. Referenced clinical preprocessing INIs, matrix headers and training
+data remain owned by their enabled handlers. Disabled classifier INIs are never
+opened; loading disabled starters still needs no referenced files or Ray runtime.
 
 Enabled model output directories must be distinct after path resolution; this
 check does not inspect plotting/input-building outputs hidden inside INIs.

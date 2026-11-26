@@ -2,6 +2,16 @@
 
 Project releases use `vX.Y.Z` tags. See [the release process](docs/release-process.md).
 
+## [0.4.0] — 2026-11-26
+
+### Added
+
+- Real local Ray worker execution for MLP, hard multi-output perceptron and multinomial logistic-regression training, with explicit CPU resources, task timeout, failure propagation and owned-runtime cleanup. Saved-model prediction remains independent of Ray.
+- A genuine multiclass multi-output perceptron with sequential mistake updates, raw class scores and portable JSON artifacts; it does not expose probabilities.
+- Strict model INI profiles with configurable hidden widths, different activation functions per hidden layer, initialization, optimization and Ray settings. Include a fully commented example and configuration guide.
+- CLI config/profile selection and XML-relative model INI references. Enabled model INIs are preflighted before preprocessing; disabled references are not opened. Existing flag-only/inline workflows remain supported and use Ray.
+- Synthetic numerical, serialization, configuration, real-worker, CLI/XML and runtime-independent inference coverage. Preserve the course-aligned Rosenblatt algorithm and research-only safeguards.
+
 ## [0.3.0] — 2026-11-26
 
 ### Changed
